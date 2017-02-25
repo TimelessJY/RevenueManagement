@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[18]:
+# In[48]:
 
 import numpy as np
 
@@ -61,8 +61,48 @@ def calc_displacement_adjusted_revenue(products, resources, static_bid_prices):
 
     return disp_adjusted_revs
 
-
-# In[ ]:
-
-
+# Calculates the squared deviation of revenue within partition (l, k), for resource i
+# ref: example 3.5
+def calc_squared_deviation_of_revenue(i, l, k, mean_demands, disp_adjusted_revs):
+    """
+    Parameter
+    ----------
+    i: integer
+        the index of the resource
+    l: integer
+        the starting index of the partition, i.e. the index of the first product in this partition
+        product index starts from 0
+    k: integer
+        the ending index of the partition, i.e. the index of the last product in this partition
+    mean_demands: np array
+        contains tuples for mean demands of products, in the form of (product_name, mean_demand), size n_products
+    disp_adjusted_revs: 2D np array
+        contains tuples for displacement-adjusted revenues, in the form of (value, name of product),
+        size n_resources * n_products
+   
+    Returns
+    -------
+    sqrd_deriv_revenue: number
+        the squared deviation of revenue within the given partition
+    """
+    
+    # calculated the weighted-average displacement adjusted revenue for the given partition
+    sum_demands = 0
+    demands_times_disp_adjusted_rev = 0
+    for j in range(l, k + 1):
+        product_name = disp_adjusted_revs[i][j][1]
+        product_mean_demand = float(next((v[1] for v, v in enumerate(mean_demands) if v[0] == product_name), 0))
+        sum_demands += product_mean_demand
+        demands_times_disp_adjusted_rev += product_mean_demand * disp_adjusted_revs[i][j][0]
+    if sum_demands == 0:
+        m = 0
+    else:
+        m = demands_times_disp_adjusted_rev / sum_demands  
+    
+    sqrd_deriv_revenue = 0
+    for j in range(l, k + 1):
+        product_name = disp_adjusted_revs[i][j][1]
+        product_mean_demand = float(next((v[1] for v, v in enumerate(mean_demands) if v[0] == product_name), 0))
+        sqrd_deriv_revenue += product_mean_demand * (disp_adjusted_revs[i][j][0] - m)**2
+    return sqrd_deriv_revenue
 
