@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[18]:
+# In[20]:
 
 import unittest
 
@@ -36,6 +36,13 @@ class network_DAVN_tests(unittest.TestCase):
         expected_sqrd_deriv_revenue = 4983950.43956
         np.testing.assert_almost_equal(sqrd_deriv_rev, expected_sqrd_deriv_revenue, decimal=5)
         
+    def test_clustering(self):
+        n_class = 3
+        partitions = network_DAVN.clustering(self.test_products, self.test_resources, self.test_disp_adjusted_revenue,                                             n_class, self.test_mean_demands)
+        expected_partitions = [[["ABC", "BCD"], ["AB"], ["CD"]] for i in range(2)]
+        expected_partitions.append([['ABC', 'BCD'], ['CD'], ['AB']])
+        
+        np.testing.assert_equal(partitions, expected_partitions)
         
 a = network_DAVN_tests()
 suite = unittest.TestLoader().loadTestsFromModule(a)

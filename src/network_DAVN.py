@@ -1,8 +1,9 @@
 
 # coding: utf-8
 
-# In[48]:
+# In[118]:
 
+import warnings
 import numpy as np
 
 # Calculate the displacement-adjusted revenues, 
@@ -61,6 +62,7 @@ def calc_displacement_adjusted_revenue(products, resources, static_bid_prices):
 
     return disp_adjusted_revs
 
+
 # Calculates the squared deviation of revenue within partition (l, k), for resource i
 # ref: example 3.5
 def calc_squared_deviation_of_revenue(i, l, k, mean_demands, disp_adjusted_revs):
@@ -86,6 +88,12 @@ def calc_squared_deviation_of_revenue(i, l, k, mean_demands, disp_adjusted_revs)
         the squared deviation of revenue within the given partition
     """
     
+    if k < l:
+        warnings.warn("Wrong indices for the partition")
+    
+    if i >= len(disp_adjusted_revs):
+        warnings.warn("Resource index out of boundary")
+        
     # calculated the weighted-average displacement adjusted revenue for the given partition
     sum_demands = 0
     demands_times_disp_adjusted_rev = 0
@@ -105,4 +113,91 @@ def calc_squared_deviation_of_revenue(i, l, k, mean_demands, disp_adjusted_revs)
         product_mean_demand = float(next((v[1] for v, v in enumerate(mean_demands) if v[0] == product_name), 0))
         sqrd_deriv_revenue += product_mean_demand * (disp_adjusted_revs[i][j][0] - m)**2
     return sqrd_deriv_revenue
+
+
+# Implement the clustering process, partition products using each resource into a group of virtual classes.
+# This is done by dynamic programming, looking for the partitions that can give the minimum squared deriviation
+# of revenue (i.e. total within-group variation)
+# ref: section 3.4.3, example 3.5
+def clustering(products, resources, disp_adjusted_revs, n_virtual_class, mean_demands):
+    """
+    Parameter
+    ----------
+    products: np array
+        contains tuples for products, in the form of (name, revenue), size n_products
+    resources: np array
+        contains names of resources, size n_resources
+    disp_adjusted_revs: 2D np array
+        contains tuples for displacement-adjusted revenues, in the form of (value, name of product),
+        size n_resources * n_products
+    n_virtual_class: integer
+        the number of virtual classes to partition the products into
+    mean_demands: np array
+        contains mean demands for each product, size n_products
+   
+    Returns
+    -------
+    ??
+    """
+    
+    if n_virtual_class >= len(disp_adjusted_revs[0]):
+        warnings.warn("More virtual classes than number of products")
+        
+    n_resources = len(resources) # number of resources
+    n_products = len(products) # number of products
+    
+    # calculate the minimum total squared deviation using dynamic programming, with the formula
+    # V_c(k) = min(over 1<= l <= k) {c_{lk} + V_{c-1}(l-1)}, note that k, l indexed from 1 onwards,
+    # c indexed from 1 (as V_0(k) is not used).
+    # indexes l, k used in calc_squared_deviation_of_revenue should start from 0
+
+    partitions_for_resources = []
+    for i in range(n_resources):
+        V = [[()]*(n_products +1) for _ in range(n_virtual_class)] # holds the minimum total squared deviation
+
+        # initialize V_1(k) = c_1k, for k = 1..numClass
+        V[0][0] = (0, 0)
+        for k in range(1, n_virtual_class + 1):
+            V[0][k] = (calc_squared_deviation_of_revenue(i, 0, k-1, mean_demands, disp_adjusted_revs), 0)
+
+        # calculate V_2(k) onwards
+        for c in range(1, n_virtual_class):
+            for k in range(c + 2):
+                V[c][k] = (0, 0)
+            for k in range(c + 2, n_products + 1):
+                v = np.nan # record the minimum squared deviation
+                opt_l = -1 # record the starting index of the partition which gives the minimum squard deviation
+                for l in range(1, k + 1):
+                    v_new = calc_squared_deviation_of_revenue(i, l-1, k-1, mean_demands, disp_adjusted_revs)                            + V[c-1][l-1][0]
+                    if np.isnan(v) or v_new < v:
+                        v = v_new
+                        opt_l = l
+
+                V[c][k] = (v, opt_l - 1)
+
+        partition_indicies = []
+        c = n_virtual_class - 1
+        l = n_products
+        while True:
+            l = V[c][l][1]
+            partition_indicies.insert(0, l)
+            c -= 1
+            if l == 0 or c == 0:
+                break
+        print("indicies for partition of source ", resources[i], " is: ", partition_indicies)
+
+        partition_indicies.append(n_products)
+        partitions = []
+        start_index = 0
+        for p in range(len(partition_indicies)):
+            partition = []
+            for j in range(start_index, partition_indicies[p]):
+                partition.append(disp_adjusted_revs[i][j][1])
+            start_index = partition_indicies[p]
+            partitions.append(partition)
+
+        print("virtual classes of products for resource ", resources[i], " is: ", partitions)
+        
+        partitions_for_resources.append(partitions)
+    return partitions_for_resources
 
