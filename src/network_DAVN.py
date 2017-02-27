@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[118]:
+# In[24]:
 
 import warnings
 import numpy as np
@@ -140,7 +140,7 @@ def clustering(products, resources, disp_adjusted_revs, n_virtual_class, mean_de
     ??
     """
     
-    if n_virtual_class >= len(disp_adjusted_revs[0]):
+    if n_virtual_class > len(disp_adjusted_revs[0]):
         warnings.warn("More virtual classes than number of products")
         
     n_resources = len(resources) # number of resources
@@ -155,10 +155,12 @@ def clustering(products, resources, disp_adjusted_revs, n_virtual_class, mean_de
     for i in range(n_resources):
         V = [[()]*(n_products +1) for _ in range(n_virtual_class)] # holds the minimum total squared deviation
 
-        # initialize V_1(k) = c_1k, for k = 1..numClass
+        # initialize V_1(k) = c_1k, for k = 1..n_virtual_class
         V[0][0] = (0, 0)
         for k in range(1, n_virtual_class + 1):
             V[0][k] = (calc_squared_deviation_of_revenue(i, 0, k-1, mean_demands, disp_adjusted_revs), 0)
+        for k in range(n_virtual_class + 1, n_products+1):
+            V[0][k] = (0, 0)
 
         # calculate V_2(k) onwards
         for c in range(1, n_virtual_class):
@@ -200,4 +202,14 @@ def clustering(products, resources, disp_adjusted_revs, n_virtual_class, mean_de
         
         partitions_for_resources.append(partitions)
     return partitions_for_resources
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
 
