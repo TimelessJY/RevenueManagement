@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[24]:
+# In[4]:
 
 import warnings
 import numpy as np
@@ -14,7 +14,7 @@ def calc_displacement_adjusted_revenue(products, resources, static_bid_prices):
     Parameter
     ----------
     products: np array
-        contains tuples for products, in the form of (name, revenue), size n_products
+        contains products, each in the form of [name, probabilities, revenue], size n_products
     resources: np array
         contains names of resources, size n_resources
     static_bid_prices: np array
@@ -54,7 +54,7 @@ def calc_displacement_adjusted_revenue(products, resources, static_bid_prices):
         for j in range(n_products):
             product_name = products[j][0]
             if A[i][j] == 1: # only calculates for products that uses resource i
-                disp_adjusted_revs[i][j] = (int(products[j][1]) - sum_static_bid_prices[j] + static_bid_prices[i],                                             product_name)
+                disp_adjusted_revs[i][j] = (int(products[j][2]) - sum_static_bid_prices[j] + static_bid_prices[i],                                             product_name)
             else:
                 disp_adjusted_revs[i][j] = (0, product_name)
         disp_adjusted_revs[i].sort(key = lambda tup: tup[0], reverse=True)
@@ -124,7 +124,7 @@ def clustering(products, resources, disp_adjusted_revs, n_virtual_class, mean_de
     Parameter
     ----------
     products: np array
-        contains tuples for products, in the form of (name, revenue), size n_products
+        contains products, each in the form of [name, probabilities, revenue], size n_products
     resources: np array
         contains names of resources, size n_resources
     disp_adjusted_revs: 2D np array
@@ -137,7 +137,9 @@ def clustering(products, resources, disp_adjusted_revs, n_virtual_class, mean_de
    
     Returns
     -------
-    ??
+    paritions: np array
+        consists virtual classes for every resource, each contains the names of products in that class
+        size n_partition
     """
     
     if n_virtual_class > len(disp_adjusted_revs[0]):

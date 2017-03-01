@@ -15,7 +15,7 @@ from src import network_DAVN
 class network_DAVN_tests(unittest.TestCase):
 
     # test data
-    test_products = np.array([('AB', 100), ('CD', 100), ('ABC', 1000), ('BCD', 1000)])
+    test_products = np.array([['AB', 0.5, 100], ['CD', 0.5, 100], ['ABC', 0.5, 1000], ['BCD',0.5, 1000]])
     test_resources = np.array(['AB', 'BC', 'CD'])
     test_mean_demands = np.array([('AB', 10.1), ('CD', 5.3), ('ABC',8), ('BCD', 9.2)])
     test_disp_adjusted_revenue = [[(955, 'ABC'), (955, 'BCD'), (70, 'AB'), (0, 'CD')],                                          [(975, 'ABC'), (975, 'BCD'), (90, 'AB'), (85, 'CD')],                                           [(960, 'ABC'), (960, 'BCD'), (70, 'CD'), (0, 'AB')]]
