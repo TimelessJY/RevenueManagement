@@ -1,10 +1,14 @@
 
 # coding: utf-8
 
-# In[4]:
+# In[40]:
 
 import warnings
 import numpy as np
+
+import sys
+sys.path.append('/Users/jshan/Desktop/RevenueManagement')
+from src import singleResource_DCM
 
 # Calculate the displacement-adjusted revenues, 
 # which is to approximate the net benefit of accepting product j on resource i
@@ -77,7 +81,7 @@ def calc_squared_deviation_of_revenue(i, l, k, mean_demands, disp_adjusted_revs)
     k: integer
         the ending index of the partition, i.e. the index of the last product in this partition
     mean_demands: np array
-        contains tuples for mean demands of products, in the form of (product_name, mean_demand), size n_products
+        contains mean demands of products, in the form of [product_name, mean_demand], size n_products
     disp_adjusted_revs: 2D np array
         contains tuples for displacement-adjusted revenues, in the form of (value, name of product),
         size n_resources * n_products
@@ -133,7 +137,7 @@ def clustering(products, resources, disp_adjusted_revs, n_virtual_class, mean_de
     n_virtual_class: integer
         the number of virtual classes to partition the products into
     mean_demands: np array
-        contains mean demands for each product, size n_products
+        contains mean demands of products, in the form of [product_name, mean_demand], size n_products
    
     Returns
     -------
@@ -188,22 +192,151 @@ def clustering(products, resources, disp_adjusted_revs, n_virtual_class, mean_de
             c -= 1
             if l == 0 or c == 0:
                 break
-        print("indicies for partition of source ", resources[i], " is: ", partition_indicies)
+        # print("indicies for partition of source ", resources[i], " is: ", partition_indicies)
 
         partition_indicies.append(n_products)
         partitions = []
         start_index = 0
         for p in range(len(partition_indicies)):
             partition = []
+            names = ''
             for j in range(start_index, partition_indicies[p]):
-                partition.append(disp_adjusted_revs[i][j][1])
+#                 partition.append(disp_adjusted_revs[i][j][1])
+                if names:
+                    names+=','
+                names+= disp_adjusted_revs[i][j][1]
+            partition = [names]
             start_index = partition_indicies[p]
             partitions.append(partition)
 
-        print("virtual classes of products for resource ", resources[i], " is: ", partitions)
+        # print("virtual classes of products for resource ", resources[i], " is: ", partitions)
         
         partitions_for_resources.append(partitions)
     return partitions_for_resources
+
+
+# Computes and append a probability of demand for each virtual class of products, 
+# which is the mean demand weighted average displacement-adjusted revenue.
+# ref: section 3.4.3
+def probability_of_demands(virtual_classes, mean_demands):
+    """
+    Parameter
+    ----------
+    virtual_classes: 2D np array
+        contains virtual classes of products for each resource, size n_resources * n_products
+    mean_demands: np array
+        contains mean demands of products, in the form of [product_name, mean_demand], size n_products
+   
+    Returns
+    -------
+    virtual_classes: 2D np array
+        consists virtual classes of products for each resource, with probability of a demand added
+        size n_resources * n_products
+    """
+
+    total_demands = 0
+    for product in mean_demands:
+        total_demands += product[1]
+    
+    for i in range(len(virtual_classes)):
+        for j in range(len(virtual_classes[i])):
+            products = [x.strip() for x in virtual_classes[i][j][0].split(',')]
+            mean_probability = 0
+            total_probability = 0
+            for product in products:
+                demand = float(next((v[1] for v, v in enumerate(mean_demands) if v[0] == product), 0))
+                total_probability += demand / total_demands
+            mean_probability = round(total_probability / len(products), 3)
+            virtual_classes[i][j].append(mean_probability)
+
+    return virtual_classes
+
+
+# Computes and append a representative revenue value for each virtual class of products, 
+# which is the mean demand weighted average displacement-adjusted revenue.
+# ref: section 3.4.3
+def representative_revenue(virtual_classes, mean_demands, disp_adjusted_revs):
+    """
+    Parameter
+    ----------
+    virtual_classes: 2D np array
+        contains virtual classes of products for each resource, size n_resources * n_products
+    mean_demands: np array
+        contains mean demands of products, in the form of [product_name, mean_demand], size n_products
+    disp_adjusted_revs: 2D np array
+        contains tuples for displacement-adjusted revenues, in the form of (value, name of product),
+        size n_resources * n_products
+   
+    Returns
+    -------
+    virtual_classes: 2D np array
+        consists virtual classes of products for each resource, with representative revenue added
+        size n_resources * n_products
+    """
+    for i in range(len(virtual_classes)):
+        for j in range(len(virtual_classes[i])):
+            if not virtual_classes[i][j]:
+                continue
+            products = [x.strip() for x in virtual_classes[i][j][0].split(',')]
+            representative_rev = 0
+            total_mean_demand = 0
+            weighted_disp_adjusted_rev = 0
+            for product in products:
+                demand = float(next((v[1] for v, v in enumerate(mean_demands) if v[0] == product), 0))
+                disp_adjusted_rev = float(next((v[0] for v,v in enumerate(disp_adjusted_revs[i]) if v[1]==product),0))
+                total_mean_demand += demand
+                weighted_disp_adjusted_rev += disp_adjusted_rev * demand
+            if total_mean_demand > 0:
+                representative_rev = round(weighted_disp_adjusted_rev/total_mean_demand, 3)
+            virtual_classes[i][j].append(representative_rev)
+
+    return virtual_classes
+
+# Main function, calculates the value-function estimate for DAVN problem,
+# by clustering products into virtual classes and then solving a single-resource problem
+def calculate_value_function(products, resources, static_bid_prices, n_virtual_class, mean_demands, total_capacity,                              max_time, arrival_rate):
+    """
+    Parameter
+    ----------
+    products: np array
+        contains products, each in the form of [name, probabilities, revenue], size n_products
+    resources: np array
+        contains names of resources, size n_resources
+    static_bid_prices: np array
+        contains static bid prices or marginal value estimates, size n_resources
+    n_virtual_class: integer
+        the number of virtual classes to partition the products into
+    mean_demands: np array
+        contains mean demands of products, in the form of [product_name, mean_demand], size n_products
+    total_capacity(C): integer
+        the total capacity
+    max_time(T): integer
+        the number of time periods
+    arrival_rate: number
+        the probability of arrival of a request, assumed to be constant for all time periods
+    
+    Returns
+    -------
+    value: 2D np array
+        contains the value functions, size (max_time + 1) * (total_capacity + 1)
+    """
+        
+    # calculates the displacement-adjusted revenues
+    disp_adjusted_revenue = calc_displacement_adjusted_revenue(products, resources, static_price)
+    # clusters products into virtual classes
+    virtual_classes = clustering(products, resources, disp_adjusted_revenue, n_virtual_class, mean_demands)
+    
+    # appends the probability of a demand and a representative revenue onto each virtual class
+    probab_appended = probability_of_demands(virtual_classes, mean_demands)
+    complete_classes = representative_revenue(virtual_classes, mean_demands, disp_adjusted_revenue)
+    
+    print(complete_classes)
+    value_functions = []
+    for i in range(len(resources)):
+        # for each resource, solve a single-resource problem
+        value_func = singleResource_DCM.calc_value_function(complete_classes[i], total_capacity, max_time,                                                             arrival_rate)
+        value_functions.append(value_func)
+    return value_functions
 
 
 # In[ ]:
