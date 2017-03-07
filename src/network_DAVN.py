@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[40]:
+# In[2]:
 
 import warnings
 import numpy as np
@@ -317,12 +317,12 @@ def calculate_value_function(products, resources, static_bid_prices, n_virtual_c
     
     Returns
     -------
-    value: 2D np array
-        contains the value functions, size (max_time + 1) * (total_capacity + 1)
+    value: 3D np array
+        contains the value functions, size n_resources * (max_time + 1) * (total_capacity + 1)
     """
         
     # calculates the displacement-adjusted revenues
-    disp_adjusted_revenue = calc_displacement_adjusted_revenue(products, resources, static_price)
+    disp_adjusted_revenue = calc_displacement_adjusted_revenue(products, resources, static_bid_prices)
     # clusters products into virtual classes
     virtual_classes = clustering(products, resources, disp_adjusted_revenue, n_virtual_class, mean_demands)
     
@@ -330,7 +330,6 @@ def calculate_value_function(products, resources, static_bid_prices, n_virtual_c
     probab_appended = probability_of_demands(virtual_classes, mean_demands)
     complete_classes = representative_revenue(virtual_classes, mean_demands, disp_adjusted_revenue)
     
-    print(complete_classes)
     value_functions = []
     for i in range(len(resources)):
         # for each resource, solve a single-resource problem
