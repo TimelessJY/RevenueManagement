@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[15]:
+# In[26]:
 
 import warnings
 import numpy as np
@@ -79,12 +79,12 @@ def efficient_sets(products, sets):
 # In nested policy, once identified the efficient sets
 # can compute the objective function value to find out which efficient set is optimal for that capacity x.
 # ref: section 2.6.2.5
-def optimal_set_for_capacity(effi_sets, marginal_values):
+def optimal_set_for_capacity(product_sets, marginal_values):
     """
     Parameter
     ----------
-    effi_sets: np array
-        contains efficient sets, each in the form of [product_name, prob, revenue], size n_effi_sets
+    product_sets: np array
+        contains product sets, each in the form of [product_name, prob, revenue], size n_product_sets
     marginal_values: np array
         contains expected marginal value of every capacity at time t+1, size n_capacity
    
@@ -96,57 +96,72 @@ def optimal_set_for_capacity(effi_sets, marginal_values):
     
     n_capacity = len(marginal_values)
     optimal_set = []
-    n_effi_sets = len(effi_sets)
+    n_product_sets = len(product_sets)
     for i in range(n_capacity):
         max_diff = 0
         curr_opt_set = -1
-        for j in range(n_effi_sets):
-            diff = effi_sets[j][2] - effi_sets[j][1] * marginal_values[i]
+        for j in range(n_product_sets):
+            diff = product_sets[j][2] - product_sets[j][1] * marginal_values[i]
             if diff > max_diff:
                 max_diff = diff
-                curr_opt_set = effi_sets[j][0]
+                curr_opt_set = product_sets[j][0]
         optimal_set.append(curr_opt_set)
     return optimal_set
 
                                 
-# In nested policy, calculate the optimal protection levels for each (efficient) class
-def optimal_protection_levels(effi_sets, marginal_values):
+# In nested policy, calculate the optimal protection levels for each (efficient) class, at the given time, 
+# given the result from value-function
+def optimal_protection_levels(product_sets, values, time):
     """
     Parameter
     ----------
-    effi_sets: np array
-        contains efficient sets, each in the form of [product_name, prob, revenue], size n_effi_sets
-    marginal_values: np array
-        contains expected marginal value of every capacity at time t+1, size n_marginal_values
-   
+    product_sets: np array
+        contains product sets, each in the form of [product_name, prob, revenue], size n_product_sets
+    value: 2D np array
+        contains the value functions, size (max_time + 1) * (total_capacity + 1)
+    time: integer
+        the discrete time point at which the optimal protection levels are requested
     Returns
     -------
     protection_levels: np array
-        contains the optimal protection level for the given efficient sets, size n_efficient_sets
+        contains the optimal protection level for the given product sets at the given time, size n_product_sets
     """
 
-    n_effi_sets = len(effi_sets)
-    n_marginal_values = len(marginal_values)
+    if not values: 
+        return 0
+    
+    total_time = len(values)
+    total_capacity = len(values[0]) - 1
+    
+    if time > total_time or time < 0:
+        return 0
+    
+    value_delta = []
+    for i in range(1, total_capacity + 1):
+        value_delta.append(values[time][i] - values[time][i-1])
+    
+    n_product_sets = len(product_sets)
     protection_levels = []
-    for i in range(n_effi_sets - 1):
-        for capacity in reversed(range(n_marginal_values)):
-            diff = effi_sets[i][2] - effi_sets[i][1] * marginal_values[capacity]
-            nextDiff = effi_sets[i+1][2] - effi_sets[i+1][1] * marginal_values[capacity]
+    for i in range(n_product_sets - 1):
+        for capacity in reversed(range(total_capacity)):
+            diff = product_sets[i][2] - product_sets[i][1] * value_delta[capacity]
+            nextDiff = product_sets[i+1][2] - product_sets[i+1][1] * value_delta[capacity]
             if diff > nextDiff:
                 protection_levels.append(capacity + 1)
                 break
-    protection_levels.append(n_marginal_values)
+    protection_levels.append(total_capacity)
     return protection_levels
 
 # Calculates value functions V_t(x) for different remaining capacity, x = 0 ... C
 # using backward computations, starting from V_T(x) back to V_0(x)
 # ref: function 2.26
-def calc_value_function(effi_sets, total_capacity, max_time, arrival_rate):
+def calc_value_function(product_sets, total_capacity, max_time, arrival_rate):
     """
     Parameter
     ----------
-    effi_sets: np array
-        contains efficient sets, each in the form of [product_name, prob, revenue], size n_effi_sets
+    product_sets: np array
+        contains sets of products on offer, each in the form of [product_name, prob, revenue], size n_product_sets
+        where the prob(probability) and revenue are aggregated values
     total_capacity(C): integer
         the total capacity
     max_time(T): integer
@@ -166,14 +181,17 @@ def calc_value_function(effi_sets, total_capacity, max_time, arrival_rate):
         for x in range(1, total_capacity + 1):
             max_obj_val = 0 
             delta = prev_V[x] - prev_V[x-1] # the marginal cost of capacity in the next period
-            for s in effi_sets:
+            for s in product_sets:
+                if not s:
+                    continue
                 obj_val = s[2] - s[1] * delta # the difference between the expected revenue from offering set S, 
                 # and the revenue if a request in set S is accepted
                 if obj_val > max_obj_val:
                     max_obj_val = obj_val
             max_obj_val *= arrival_rate
             max_obj_val += prev_V[x]
-            curr_V[x] = max_obj_val
+            curr_V[x] = round(max_obj_val, 3)
+            
         V.insert(0, curr_V)
         prev_V = curr_V
     return V

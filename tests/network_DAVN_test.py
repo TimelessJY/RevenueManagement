@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[20]:
+# In[5]:
 
 import unittest
 
@@ -39,8 +39,8 @@ class network_DAVN_tests(unittest.TestCase):
     def test_clustering(self):
         n_class = 3
         partitions = network_DAVN.clustering(self.test_products, self.test_resources, self.test_disp_adjusted_revenue,                                             n_class, self.test_mean_demands)
-        expected_partitions = [[["ABC", "BCD"], ["AB"], ["CD"]] for i in range(2)]
-        expected_partitions.append([['ABC', 'BCD'], ['CD'], ['AB']])
+        expected_partitions = [[["ABC,BCD"], ["AB"], ["CD"]] for i in range(2)]
+        expected_partitions.append([['ABC,BCD'], ['CD'], ['AB']])
         
         np.testing.assert_equal(partitions, expected_partitions)
         

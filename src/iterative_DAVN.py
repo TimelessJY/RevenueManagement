@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[12]:
+# In[7]:
 
 import warnings
 import numpy as np
@@ -55,17 +55,22 @@ def iterative_DAVN(products, resources, n_virtual_class, mean_demands, total_cap
     while k < 100:
     
         # Step 1: compute new displacement-adjusted revenues, compute value-function estimated using DAVN method
+        print("calculating value function using: ", static_bid_prices[k])
         value_funcs = network_DAVN.calculate_value_function(products, resources, static_bid_prices[k],                                                n_virtual_class, mean_demands, total_capacity, max_time, arrival_rate)
+        print('value func: ', value_funcs)
         deltas = []
         for i in range(n_resources):
-            value_func_i = value_funcs[i][current_time]
-            delta = value_func_i[total_capacity - 1] - value_func_i[total_capacity - 2]
+#             value_func_i = value_funcs[i][current_time]
+            value_func_i = value_funcs[i][max_time]
+            print(" i = ", i, ", value_func = ", value_func_i)
+#             delta = value_func_i[total_capacity - 1] - value_func_i[total_capacity - 2]
+            delta = value_func_i[total_capacity] - value_func_i[total_capacity - 1]
             deltas.append(delta)
 
         # Step 2: check for convergence
         convergent = True
         for i in range(n_resources):
-            if abs(deltas[i]-static_bid_prices[k][i]) > THRESHOLD:
+            if abs(deltas[i]-static_bid_prices[k][i]) >= THRESHOLD:
                 convergent = False
                 break
 
@@ -73,10 +78,35 @@ def iterative_DAVN(products, resources, n_virtual_class, mean_demands, total_cap
             static_bid_prices.append(deltas)
             k += 1
         else:
+            print("stop at k = ", k, ", with static_bid_prices = ", static_bid_prices[k])
             return static_bid_prices[k]
         
     print("after 100 rounds, haven't converged")
     return static_bid_prices[k]
+    
+# products = [['AB', 0.5, 100], ['CD', 0.5, 156], ['ABC', 0.5, 800], ['BCD',0.5, 1000]]
+
+# products = [['AB', 0.5, 100], ['CD', 0.5, 156], ['ABC', 0.5, 800], ['BCD',0.5, 1000],['CDA', 0.5, 401]]
+# products = [['AB', 0.5, 100], ['CD', 0.5, 156], ['ABC', 0.5, 800], ['BCD',0.5, 1000]]
+
+products = [['AB', 0.5, 100], ['CD', 0.5, 100],['ABC', 0.5, 1000], ['BCD',0.5, 1000]]
+resources =  ['AB', 'BC', 'CD']
+demand = 50
+# mean_demands = [['AB', 10.1], ['CD', 5.3], ['ABC',8], ['BCD', 9.2], ['CDA', 3]]
+mean_demands = [['AB', demand], ['CD',demand], ['ABC',demand], ['BCD', demand]]
+n_virtual_class = 2
+static_price = [0, 0, 0]
+##### iterate between [0, 0, 0] and [450, 450, 450] (pi)
+# static_price = [0.5, 0.5, 0.5]
+# disp_adjusted_revenue = calc_displacement_adjusted_revenue(products, resources, static_price)
+# calculate_value_function(products, resources, static_price, n_virtual_class, mean_demands, 10, 2, 0.5)
+
+# iterative_DAVN(products, resources, n_virtual_class, mean_demands, 1, 2, 5, 1)
+
+calculate_value_function(products, resources, static_price, n_virtual_class, mean_demands, 1, 2, 5)
+# network_DAVN.hahaha(2)
+# network_DAVN.noob(2)
+# noob(2)
 
 
 # In[ ]:
