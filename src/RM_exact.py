@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[243]:
+# In[9]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -35,13 +35,15 @@ class Single_RM():
             size total_time * (capacity + 1), i.e. T*(C+1)
         protection_levels: 2D np array
             contains the time-dependent optimal protection level for each class
-            size (total_time - 1) * (n_products - 1)
+            size total_time * n_products
+            (although it's always zero for all the products in the last time period, 
+                and for the last product in each time period)
     """
     
     value_functions = []
     protection_levels = []
     
-    def __init__(self, products, demands, capacity, total_time = len(demands)):
+    def __init__(self, products, demands, capacity, total_time):
         """Return a framework for a single-resource RM problem."""
         self.products = products
         self.demands = demands
@@ -64,58 +66,46 @@ class Single_RM():
                 raise ValueError('The products are not in the descending order of their revenues.')
         
     def value_func(self):
-        """Return the value functions of this problem, calculate it if necessary. """
+        """Calculate and return  the value functions of this problem."""
         
-        if len(self.value_functions) > 0:
-            return self.value_functions
-        
-        value_functions = [[0]*(self.capacity+1) for _ in range(self.total_time)] 
+        self.value_functions = [[0]*(self.capacity+1) for _ in range(self.total_time)] 
         for t in range(self.total_time - 1, -1, -1):
             for x in range(1, self.capacity + 1):
                 value = 0
-                if t + 1 == self.total_time:
-                    delta_next_V = 0
-                else:
-                    delta_next_V = value_functions[t+1][x] - value_functions[t+1][x-1]
+                delta_next_V = 0
+                if t < self.total_time - 1:
+                    value += self.value_functions[t+1][x]
+                    delta_next_V = self.value_functions[t+1][x] - self.value_functions[t+1][x-1]
 
                 for j in range(self.n_products):
                     demand_prob = self.demands[t][j]
                     rev = self.products[j][1]
 
                     value += demand_prob * max(rev - delta_next_V, 0)
-                value_functions[t][x] = round(value, 3)
-        self.value_functions = value_functions
-        return value_functions
+                self.value_functions[t][x] = round(value, 3)
+        return self.value_functions
     
     def optimal_protection_levels(self):
-        """Return the optimal protection levels of this problem, calculate it if necessary. """
+        """Calculate and return the optimal protection levels of this problem. """
         
-        if len(self.protection_levels) > 0:
-            return self.protection_levels
-        
-        protection_levels = [[0]*(self.n_products - 1) for _ in range(self.total_time - 1)]
+        self.protection_levels = [[0]* self.n_products for _ in range(self.total_time)]
         
         for t in range(self.total_time - 1):
             for j in range(self.n_products - 1):
                 for x in range(self.capacity, 0, -1):
                     delta_V = self.value_functions[t+1][x] - self.value_functions[t+1][x-1]
-#                     print("delta: ", delta_V)
                     if self.products[j+1][1] < delta_V:
-                        protection_levels[t][j] = x
-#                         print("for t,j=", t, j, ", x = ", x)
+                        self.protection_levels[t][j] = x
                         break
-        self.protection_levels = protection_levels
-        return protection_levels
+        return self.protection_levels
 
 products = [1, 30], [2, 25], [3, 12], [4, 4]
 demands = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
 problem = Single_RM(products, demands, 3, 3)
 print(problem.value_func())
 
-problem.optimal_protection_levels()
 
-
-# In[244]:
+# In[8]:
 
 ##############################
 ###### Network_RM DP #########
@@ -156,9 +146,9 @@ class Network_RM():
     
     value_functions = []
     protection_levels = []
-    incidence_matrix
+    incidence_matrix = []
     
-    def __init__(self, products, resources, demands, capacities, total_time = len(demands)):
+    def __init__(self, products, resources, demands, capacities, total_time):
         """Return a framework for a single-resource RM problem."""
         
         self.products = products
@@ -175,15 +165,12 @@ class Network_RM():
             
         # Check that the capacity for each resource is given
         if len(capacities) != self.n_resources:
-            raise ValueError('Number of capacities for products is not correct.')
+            raise ValueError('Number of capacities for resources is not correct.')
         
         # Important assumption: at most one demand will occur in each time period
-        # Demands should be specified so that demands[t][j] = revenue_j if demand for product j occurs in time period t
         for t in range(total_time):
-            if sum(1 for x in demands[t] if x > 0) > 1:
-                raise ValueError('There are more than 1 demand arriving in period '+ str(t+1) + '.')
-            if sum(1 for j in range(self.n_products) if (demands[t][j] > 0 and demands[t][j] != products[j][1])) > 0:
-                raise ValueError('Demand not specified correctly, in period '+ str(t+1))
+            if sum(demands[t]) > 1:
+                raise ValueError('There may be more than 1 demand arriving in period '+ str(t+1) + '.')
         
         # Make sure the products are sorted in descending order based on their revenues
         for j in range(self.n_products-1):
@@ -265,10 +252,11 @@ class Network_RM():
 #         print("optimal control", u)
         return u
                 
-    def eval_value(self, t, control, state_num):
+    def eval_value(self, t, control, state_num, product_num):
         """helper func: evaluate the value for period t and state x, ref: equation 3.1 in the book"""
-        demand_t = self.demands[t]
-        value = np.dot(demand_t, control)
+        price_vector = [0] * self.n_products
+        price_vector[product_num] = self.products[product_num][1]
+        value = np.dot(price_vector, control)
         Au = np.dot(self.incidence_matrix, control).tolist()
         x_Au = [x_i - Au_i for x_i, Au_i in zip(self.remain_cap(state_num), Au)]
         if t < self.total_time - 1:
@@ -283,49 +271,54 @@ class Network_RM():
         """
         Au = np.dot(self.incidence_matrix, control).tolist()
         x_Au = [x_i - Au_i for x_i, Au_i in zip(self.remain_cap(state_num), Au)]
-#         print("checking control, x-Au = ", x_Au)
         return all(x_Au_i >= 0 for x_Au_i in x_Au)
     
     def value_func(self):
         """Return the value functions of this problem, calculate it if necessary. """
         
-        if len(self.value_functions) > 0:
-            return self.value_functions
-        
         self.value_functions = [[0] * self.n_states for _ in range(self.total_time)] 
         for t in range(self.total_time - 1, -1, -1):
             for x in range(self.n_states): 
-                opt_control = self.optimal_control(x, t)
                 value = 0
-                count_1 = opt_control.count(1)
-                if count_1 == 0:
-                    value = self.eval_value(t, opt_control, x)
-                else:
-                    indicies_1 = [i for i, x in enumerate(opt_control) if x == 1]
-                    index_to_change =  list(map(list, itertools.product([0, 1], repeat=count_1)))
-                    for i in range(2**count_1):
-                    # try the optimal control and all possible sub-optimal controls
-                        sub_control = list(opt_control)
-                        to_change = index_to_change[i] # the indicies to change to get sub-optimal control
-                        change_indicies = [i for i, x in enumerate(to_change) if x == 1]
-                        for index in change_indicies:
-                            sub_control[indicies_1[index]] = 0
-#                         print("new control: ", sub_control)
+                opt_control = self.optimal_control(x, t)
+                for j in range(self.n_products):
+                    j_value = 0
+                    if demands[t][j] > 0:
+                        count_1 = opt_control.count(1)
+                        if count_1 == 0:
+                            j_value = self.eval_value(t, opt_control, x, j)
+                        else:
+                            indicies_1 = [i for i, x in enumerate(opt_control) if x == 1]
+                            index_to_change =  list(map(list, itertools.product([0, 1], repeat=count_1)))
+                            for i in range(2**count_1):
+                            # try the optimal control and all possible sub-optimal controls
+                                sub_control = list(opt_control)
+                                to_change = index_to_change[i] # the indicies to change to get sub-optimal control
+                                change_indicies = [i for i, x in enumerate(to_change) if x == 1]
+                                for index in change_indicies:
+                                    sub_control[indicies_1[index]] = 0
+#                                 print("new control: ", sub_control)
 
-                        if self.check_valid_control(x, sub_control):
-                            sub_val = self.eval_value(t, sub_control, x)
-#                             print("sub value: ", sub_val)
-                            value = max(value, sub_val)
-#                 print("t, x = ", t, x, ", value = ", value)
-                self.value_functions[t][x] = round(value, 2)
+                                if self.check_valid_control(x, sub_control):
+                                    sub_val = self.eval_value(t, sub_control, x, j)
+#                                     print("sub value: ", sub_val)
+                                    j_value = max(j_value, sub_val)
+#                         print("t, x, j = ", t, x, j, ", value = ", j_value)
+                        value += j_value * self.demands[t][j]
+                self.value_functions[t][x] = round(value, 3)
                 
         return self.value_functions
     
-products = ['12', 30], ['2', 25], ['13', 12], ['23', 4]
-resources=['1', '2', '3']
-demands = [[0, 0, 12,0],[30, 0,0,0],[0,0,0,0]]
-problem = Network_RM(products, resources, demands, [1,2,1], 3)
+products = [ ['12', 500], ['1', 250], ['2', 250]]
+resources = ['1', '2']
+demands = [[0.4, 0.3, 0.3],[0.8, 0, 0]]
+problem = Network_RM(products, resources, demands, [1,1], 2)
 print(problem.value_func())
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:
