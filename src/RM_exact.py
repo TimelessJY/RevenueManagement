@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[9]:
+# In[20]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -12,7 +12,8 @@ from operator import itemgetter
 
 
 class Single_RM():
-    """A single resource revenue management problem, with the following attributes:
+    """Solve a single resource revenue management problem using Dynamic Programming model, 
+        with the following attributes:
     
         Given:
         ----------
@@ -50,15 +51,15 @@ class Single_RM():
         self.capacity = capacity
         self.total_time = total_time
         self.n_products = len(products)
+        self.n_demand_periods = len(demands)
         
         # Check that the sequence of demands is specified for each time period
-        if len(demands) != total_time or len(demands[0]) != self.n_products:
+        if self.n_demand_periods > 1 and (len(demands) != total_time or len(demands[0]) != self.n_products):
             raise ValueError('Size of demands is not as expected.')
         
         # Important assumption: at most one demand will occur in each time period
-        for t in range(total_time):
-            if sum(demands[t]) > 1:
-                raise ValueError('There may be more than 1 demand arriving in period '+ str(t+1) + '.')
+        if ((self.n_demand_periods == 1) and (sum(demands[0]) > 1))             or ((self.n_demand_periods > 1) and any(sum(demands[t]) > 1 for t in range(total_time))):
+                raise ValueError('There may be more than 1 demand arriving.')
         
         # Make sure the products are sorted in descending order based on their revenues
         for j in range(self.n_products-1):
@@ -78,7 +79,10 @@ class Single_RM():
                     delta_next_V = self.value_functions[t+1][x] - self.value_functions[t+1][x-1]
 
                 for j in range(self.n_products):
-                    demand_prob = self.demands[t][j]
+                    if self.n_demand_periods > 1:
+                        demand_prob = self.demands[t][j]
+                    else:
+                        demand_prob = self.demands[0][j]
                     rev = self.products[j][1]
 
                     value += demand_prob * max(rev - delta_next_V, 0)
@@ -112,7 +116,8 @@ print(problem.value_func())
 ##############################
 import itertools
 class Network_RM():
-    """A multi-resource(network) revenue management problem, with the following attributes:
+    """Solve a multi-resource(network) revenue management problem using Dynamic Programming model,
+        with the following attributes:
     
         Given:
         ----------
