@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[105]:
+# In[ ]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -9,10 +9,127 @@
 import warnings
 import numpy as np
 from operator import itemgetter
+import scipy.stats
+import time
 
+class Single_RM_static():
+    """Solve a single resource revenue management problem (static model) using Dynamic Programming model, 
+        with the following attributes:
+    
+        Given:
+        ----------
+        products: 2D np array
+            contains products, each represented in the form of [product_name, expected_revenue], 
+            ordered in descending order of revenue
+            size n_products * 2
+        demands: 2D np array
+            contains the mean and std of the demand distribution for each product
+            size total_time * n_products
+        capacity: integer
+            the total capacity C, remaining capacity x ranges from 0 to C
+        
+        To be calculated:
+        ----------
+        value_functions: 2D np array
+            contains value function, ranged over time periods and remaining capacity
+            size n_products * (capacity + 1)
+        protection_levels: 2D np array
+            contains the time-dependent optimal protection level for each class
+            size total_time * n_products
+    """
+    
+    value_functions = []
+    protection_levels = []
+    
+    def __init__(self, products, demands, capacity):
+        """Return a framework for a single-resource RM problem."""
+        self.products = products
+        self.demands = demands
+        self.capacity = capacity
+        self.n_products = len(products)
+        
+        # Check that the data of demands is specified for each product
+        if len(demands) != self.n_products:
+            raise ValueError('Size of demands is not as expected.')
+        
+        # Make sure the products are sorted in descending order based on their revenues
+        for j in range(self.n_products-1):
+            if products[j][1] < products[j+1][1]:
+                raise ValueError('The products are not in the descending order of their revenues.')
+        
+    
+    def value_func(self):
+        """Calculate the value functions of this problem and the protection levels for the products."""
+        
+        self.value_functions = [[0] * (self.capacity + 1) for _ in range(self.n_products)]
+        self.protection_levels = [0] * self.n_products
+        
+        for j in range(self.n_products):
+            for x in range(self.capacity + 1):
+                normal_distr = scipy.stats.norm(self.demands[j][0], self.demands[j][1])
+                
+                val = 0
+                for dj in range(self.capacity + 1):
+                    prob_dj = normal_distr.pdf(dj)
+                    if prob_dj > 0:
+                        if j > 0:
+                            u = min(dj, max(x-self.protection_levels[j-1], 0))
+                            max_val = self.products[j][1] * u + self.value_functions[j-1][x-u]
+                        else:
+                            u = min(dj, x)
+                            max_val = self.products[j][1] * u
+                        
+                        val += prob_dj * max_val
+                
+                self.value_functions[j][x] = val
+                
+                
+            # calculates protection levels for the current fare class    
+            if j < (self.n_products - 1):
+                for x in range(self.capacity, 0, -1 ):
+                    if self.products[j+1][1] < (self.value_functions[j][x] - self.value_functions[j][x -1]):
+                        self.protection_levels[j] = x
+                        break
+#         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity], \
+#               ", with protection levels=", self.protection_levels) 
+        return (self.value_functions, self.protection_levels)
+    
+    def marginal_value_check(self):
+        """checks whether the marginal values in computed value functions satisfy the proposition 2.21"""
+        for j in range(self.n_products):
+            delta_Vj= [x-y for x, y in zip(self.value_functions[j][1:], self.value_functions[j])]
+            if any(delta_Vj[i] < delta_Vj[i+1] for i in range(self.capacity - 1)):
+                print("error type 1")
+            if j < (self.n_products -1):
+                delta_Vj_next = [x-y for x, y in zip(self.value_functions[j+1][1:], self.value_functions[j+1])]
+                if any(delta_Vj[i] > delta_Vj_next[i] for i in range(self.capacity)):
+                    print("error type 2")
+                    print("at j = ", j)
+                    print("delta_vj= ", delta_Vj)
+                    print("delta_vj_next= ", delta_Vj_next)
+                    print()
+
+# Examples, ref: example 2.3, 2.4 in "The Theory and Practice of Revenue Management"
+# products = [[1, 1050], [2,567], [3, 534], [4,520]]
+products = [[1, 1050], [2,950], [3, 699], [4,520]]
+demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
+problem = Single_RM_static(products, demands, 80)
+
+start_time = time.time()
+
+problem.value_func()
+print("--- %s seconds ---" % (time.time() - start_time))
+
+
+# In[9]:
+
+##############################
+###### Single_RM DP ##########
+##############################
+from operator import itemgetter
 
 class Single_RM_dynamic():
-    """Solve a single resource revenue management problem using Dynamic Programming model, 
+    """Solve a single resource revenue management problem (dynamic model) using Dynamic Programming model, 
         with the following attributes:
     
         Given:
@@ -87,6 +204,7 @@ class Single_RM_dynamic():
                     rev = self.products[j][1]
 
                     value += demand_prob * max(rev - delta_next_V, 0)
+                
                 self.value_functions[t][x] = round(value, 3)
         return self.value_functions
     
@@ -110,12 +228,13 @@ problem = Single_RM_dynamic(products, demands, 3, 3)
 print(problem.value_func())
 
 
-# In[106]:
+# In[14]:
 
 ##############################
 ###### Network_RM DP #########
 ##############################
 import itertools
+
 class Network_RM():
     """Solve a multi-resource(network) revenue management problem using Dynamic Programming model,
         with the following attributes:
@@ -175,9 +294,8 @@ class Network_RM():
             raise ValueError('Number of capacities for resources is not correct.')
         
         # Important assumption: at most one demand will occur in each time period
-#         if ((self.n_demand_periods == 1) and (sum(demands[0]) > 1)) \
-#             or ((self.n_demand_periods > 1) and any(sum(demands[t]) > 1 for t in range(total_time))):
-#                 raise ValueError('There may be more than 1 demand arriving.')
+        if ((self.n_demand_periods == 1) and (sum(demands[0]) > 1))             or ((self.n_demand_periods > 1) and any(sum(demands[t]) > 1 for t in range(total_time))):
+                raise ValueError('There may be more than 1 demand arriving.')
         
         # Make sure the products are sorted in descending order based on their revenues
         for j in range(self.n_products-1):
@@ -243,7 +361,6 @@ class Network_RM():
         required to satisify the request
         """
         cap_vector = self.remain_cap(state_num)
-#         print("for state ", state_num, ", remain cap=", cap_vector)
         
         u = [0] * self.n_products
         for j in range(self.n_products):
@@ -308,155 +425,24 @@ class Network_RM():
                                 change_indicies = [i for i, x in enumerate(to_change) if x == 1]
                                 for index in change_indicies:
                                     sub_control[indicies_1[index]] = 0
-#                                 print("new control: ", sub_control)
 
                                 if self.check_valid_control(x, sub_control):
                                     sub_val = self.eval_value(t, sub_control, x, j)
-#                                     print("sub value: ", sub_val)
                                     j_value = max(j_value, sub_val)
-#                         print("t, x, j = ", t, x, j, ", value = ", j_value)
                         value += j_value * demand
                 self.value_functions[t][x] = round(value, 3)
                 
-#         print([[self.remain_cap(i), v[i]] for i in range(self.n_states)] for v in self.value_functions)
         return self.value_functions
     
     def bid_price(self, curr_time):
         """Calculate the bid prices for resources at the given time."""
         bid_prices = [0 for _ in range(self.n_states)]
-
-products =[['AEB1', 420], ['CAE1', 330], ['EB1', 320], ['AEB2', 290], ['CA1', 280], ['CAE2', 260], ['AE1', 220], 
-           ['EB2', 220], ['CA2', 190], ['AEB3', 190], ['AE2', 150], ['CAE3', 150], ['EB3', 140], 
-           ['CA3', 110], ['AE3', 80]]
-resources = ['AE', 'EB', 'CA']
-demands = [[0, 0, 0.2, 0.3, 0.14, 0.33, 0, 0.2, 0.29, 0.4, 0, 0.33, 0.4, 0.43, 0.5]]
-static_price = [0, 0, 0]
-capacities = [1,2,1]
-problem = Network_RM(products, resources, demands, capacities, 3)
+        
+products = [ ['12', 500], ['1', 250], ['2', 250]]
+resources = ['1', '2']
+demands = [[0.4, 0.3, 0.3],[0.8, 0, 0]]
+problem = Network_RM(products, resources, demands, [1,1], 2)
 print(problem.value_func())
-
-
-# In[108]:
-
-##############################
-###### Single_RM DP ##########
-##############################
-import warnings
-import numpy as np
-from operator import itemgetter
-import scipy.stats
-import time
-
-class Single_RM_static():
-    """Solve a single resource revenue management problem (static model) using Dynamic Programming model, 
-        with the following attributes:
-    
-        Given:
-        ----------
-        products: 2D np array
-            contains products, each represented in the form of [product_name, expected_revenue], 
-            ordered in descending order of revenue
-            size n_products * 2
-        demands: 2D np array
-            contains the mean and std of the demand distribution for each product
-            size total_time * n_products
-        capacity: integer
-            the total capacity C, remaining capacity x ranges from 0 to C
-        total_time: integer
-            the max time period T, time period t ranges from 1 to T
-        
-        To be calculated:
-        ----------
-        value_functions: 2D np array
-            contains value function, ranged over time periods and remaining capacity
-            size total_time * (capacity + 1), i.e. T*(C+1)
-        protection_levels: 2D np array
-            contains the time-dependent optimal protection level for each class
-            size total_time * n_products
-            (although it's always zero for all the products in the last time period, 
-                and for the last product in each time period)
-    """
-    
-    value_functions = []
-    protection_levels = []
-    
-    def __init__(self, products, demands, capacity):
-        """Return a framework for a single-resource RM problem."""
-        self.products = products
-        self.demands = demands
-        self.capacity = capacity
-        self.n_products = len(products)
-        
-        # Check that the data of demands is specified for each product
-        if len(demands) != self.n_products:
-            raise ValueError('Size of demands is not as expected.')
-        
-        # Make sure the products are sorted in descending order based on their revenues
-        for j in range(self.n_products-1):
-            if products[j][1] < products[j+1][1]:
-                raise ValueError('The products are not in the descending order of their revenues.')
-        
-    
-    def value_func(self):
-        """Calculate the value functions of this problem and the protection levels for the products."""
-        
-        self.value_functions = [[0] * (self.capacity + 1) for _ in range(self.n_products)]
-        self.protection_levels = [0] * self.n_products
-        
-        for j in range(self.n_products):
-            for x in range(self.capacity + 1):
-                normal_distr = scipy.stats.norm(self.demands[j][0], self.demands[j][1])
-                val = 0
-                for dj in range(self.capacity + 1):
-                    prob_dj = normal_distr.pdf(dj)
-                    if prob_dj > 0:
-                        if j > 0:
-                            u = min(dj, max(x-self.protection_levels[j-1], 0))
-                            max_val = self.products[j][1] * u + self.value_functions[j-1][x-u]
-                        else:
-                            u = min(dj, x)
-                            max_val = self.products[j][1] * u
-                        
-                        val += prob_dj * max_val
-                
-                self.value_functions[j][x] = val
-                
-                
-            # calculates protection levels for the current fare class    
-            if j < (self.n_products - 1):
-                for x in range(self.capacity, 0, -1 ):
-                    if self.products[j+1][1] < (self.value_functions[j][x] - self.value_functions[j][x -1]):
-                        self.protection_levels[j] = x
-                        break
-        print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity],               ", with protection levels=", self.protection_levels) 
-        return (self.value_functions, self.protection_levels)
-    
-    def marginal_value_check(self):
-        for j in range(self.n_products):
-            delta_Vj= [x-y for x, y in zip(self.value_functions[j][1:], self.value_functions[j])]
-            if any(delta_Vj[i] < delta_Vj[i+1] for i in range(self.capacity - 1)):
-                print("error type 1")
-            if j < (self.n_products -1):
-                delta_Vj_next = [x-y for x, y in zip(self.value_functions[j+1][1:], self.value_functions[j+1])]
-                if any(delta_Vj[i] > delta_Vj_next[i] for i in range(self.capacity)):
-                    print("error type 2")
-                    print("at j = ", j)
-                    print("delta_vj= ", delta_Vj)
-                    print("delta_vj_next= ", delta_Vj_next)
-                    print()
-                    
-products = [[1, 1050], [2,567], [3, 534], [4,520]]
-demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
-problem = Single_RM_static(products, demands, 80)
-
-start_time = time.time()
-problem.value_func()
-print("--- %s seconds ---" % (time.time() - start_time))
-
-
-# In[68]:
-
-
 
 
 # In[ ]:
