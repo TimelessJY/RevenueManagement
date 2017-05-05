@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[5]:
+# In[8]:
 
 import pandas
 
@@ -12,7 +12,7 @@ from src import RM_approx
 
 def compare_single_static(products, demands, cap_lb, cap_ub, cap_interval):
     """Compare the exact DP model with a heuristic, EMSR-b, for static models of single-resource RM problems."""
-    col_titles = ['DP-rev', 'DP-protect', 'Appr-rev', 'Appr-protect']
+    col_titles = ['DP-rev', 'DP-protect', 'EMSR-b-rev', 'EMSR-b-protect', '%Sum.Opt']
     capacities = [c for c in range(cap_lb, cap_ub + 1, cap_interval)]
     n_products = len(products)
     
@@ -24,7 +24,11 @@ def compare_single_static(products, demands, cap_lb, cap_ub, cap_interval):
         approx_model = RM_approx.Single_EMSR(products, demands, cap)
         approx_result = approx_model.value_func()
         
-        result.append([round(dp_result[0][n_products-1][cap], 2), dp_result[1],                        round(approx_result[0][n_products-1][cap], 2), approx_result[1]])
+        dp_rev = dp_result[0][n_products - 1][cap]
+        approx_rev = approx_result[0][n_products-1][cap]
+        
+        sub_optimal = (dp_rev - approx_rev) / dp_rev * 100
+        result.append([round(dp_rev, 2), dp_result[1],round(approx_rev, 2), approx_result[1],                       "{0:.3f}%".format(sub_optimal)])
     
     print(pandas.DataFrame(result, capacities, col_titles))
 
@@ -35,6 +39,11 @@ demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 capacity = 100
 
 compare_single_static(products, demands, 80, 150, 10)
+
+
+# In[7]:
+
+
 
 
 # In[ ]:

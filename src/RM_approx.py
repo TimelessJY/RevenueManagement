@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[152]:
+# In[10]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -12,6 +12,9 @@ from operator import itemgetter
 import scipy.stats
 import time
 import math
+import sys
+sys.path.append('/Users/jshan/Desktop/RevenueManagement')
+from src import RM_helper
 
 class Single_EMSR():
     """Solve a single resource revenue management problem (static model) using EMSR heuristic,
@@ -124,34 +127,15 @@ class Single_EMSR():
         return (self.value_functions, self.protection_levels)
                 
     
-    def marginal_value_check(self):
-        for j in range(self.n_products):
-            delta_Vj= [x-y for x, y in zip(self.value_functions[j][1:], self.value_functions[j])]
-            if any(delta_Vj[i] < delta_Vj[i+1] for i in range(self.capacity - 1)):
-                print("error type 1")
-            if j < (self.n_products -1):
-                delta_Vj_next = [x-y for x, y in zip(self.value_functions[j+1][1:], self.value_functions[j+1])]
-                if any(delta_Vj[i] > delta_Vj_next[i] for i in range(self.capacity)):
-                    print("error type 2")
-                    print("at j = ", j)
-                    print("delta_vj= ", delta_Vj)
-                    print("delta_vj_next= ", delta_Vj_next)
-                    print()
-                
-products = [[1, 1050], [2,567], [3, 534], [4,520]]
-
-# products = [[1, 1050], [2,950], [3, 699], [4,520]]
-
-demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
-problem = Single_EMSR(products, demands, 80)
-
-# products = [[1, 1050], [2, 567], [3, 527], [4, 350]]
-# demands = [[17.3, 5.8], [45.1, 15.0], [73.6, 17.4], [19.8, 6.6]]
-
 start_time = time.time()
+products = [[1, 1050], [2,567], [3, 534], [4,520]]
+# products = [[1, 1050], [2,950], [3, 699], [4,520]]
+demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
+problem = Single_EMSR(products, demands, 5)
+result = problem.value_func()
+print(result)
+# RM_helper.marginal_value_check(result[0])
 
-problem.value_func()
-# problem.marginal_value_check()
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
@@ -355,29 +339,6 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
         V.insert(0, curr_V)
         prev_V = curr_V
     return V
-
-
-# effi_sets = [['Y', 0.3, 240], ['YK', 0.8, 465], ['YMK', 1, 505]]
-# values = calc_value_function(effi_sets, 10, 10, 0.2)
-# # print(len(values), len(values[0]))
-# print(values)
-# # print(values[9][2])
-
-# products = [['Y', 800], ['M',500], ['K',450]]
-# marginal_values = [780, 624, 520, 445.71, 390,346.67, 312.00, 283.64, 260.00,\
-#                                          240,222.86,208,195,183.53,173.33,164.21,156,148.57,141.82,135.65]
-    
-# sets= [[0.3, 0, 0], [0, 0.4, 0], [0, 0, 0.5], [0.1, 0.6, 0], [0.3,0,0.5], [0,0.4,0.5], [0.1, 0.4,0.5]]
-# efficient_sets = efficient_sets(products, sets)
-# print("efficient-sets", efficient_sets, "\n")
-# values = SINGLE_value_function(efficient_sets, 20, 10, 0.5)
-
-
-
-# value = calc_value_function([['AB', 0.25, 100.0]], 1, 1, 0.5)
-# print(values)
-
-# print(SINGLE_optimal_protection_levels(efficient_sets, values, 6))
 
 sets = [['AB', 0.5, 50.0]]
 print(SINGLE_value_function(sets, 1, 2, 2.5) )

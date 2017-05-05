@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[ ]:
+# In[8]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -83,7 +83,6 @@ class Single_RM_static():
                 
                 self.value_functions[j][x] = val
                 
-                
             # calculates protection levels for the current fare class    
             if j < (self.n_products - 1):
                 for x in range(self.capacity, 0, -1 ):
@@ -93,35 +92,20 @@ class Single_RM_static():
 #         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity], \
 #               ", with protection levels=", self.protection_levels) 
         return (self.value_functions, self.protection_levels)
-    
-    def marginal_value_check(self):
-        """checks whether the marginal values in computed value functions satisfy the proposition 2.21"""
-        for j in range(self.n_products):
-            delta_Vj= [x-y for x, y in zip(self.value_functions[j][1:], self.value_functions[j])]
-            if any(delta_Vj[i] < delta_Vj[i+1] for i in range(self.capacity - 1)):
-                print("error type 1")
-            if j < (self.n_products -1):
-                delta_Vj_next = [x-y for x, y in zip(self.value_functions[j+1][1:], self.value_functions[j+1])]
-                if any(delta_Vj[i] > delta_Vj_next[i] for i in range(self.capacity)):
-                    print("error type 2")
-                    print("at j = ", j)
-                    print("delta_vj= ", delta_Vj)
-                    print("delta_vj_next= ", delta_Vj_next)
-                    print()
 
 # Examples, ref: example 2.3, 2.4 in "The Theory and Practice of Revenue Management"
-# products = [[1, 1050], [2,567], [3, 534], [4,520]]
-products = [[1, 1050], [2,950], [3, 699], [4,520]]
+products = [[1, 1050], [2,567], [3, 534], [4,520]]
+# products = [[1, 1050], [2,950], [3, 699], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
-problem = Single_RM_static(products, demands, 80)
 
+problem1 = Single_RM_static(products, demands, 80)
 start_time = time.time()
 
-problem.value_func()
+vc = problem.value_func()
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[9]:
+# In[3]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -228,10 +212,10 @@ problem = Single_RM_dynamic(products, demands, 3, 3)
 print(problem.value_func())
 
 
-# In[14]:
+# In[7]:
 
-##############################
-###### Network_RM DP #########
+############################## 
+###### Network_RM DP ######### 
 ##############################
 import itertools
 
@@ -363,6 +347,7 @@ class Network_RM():
         cap_vector = self.remain_cap(state_num)
         
         u = [0] * self.n_products
+        
         for j in range(self.n_products):
             incidence_vector = [row[j] for row in self.incidence_matrix]
             diff = [x_i - a_j_i for a_j_i, x_i in zip(incidence_vector, cap_vector)]
@@ -373,11 +358,12 @@ class Network_RM():
                 
                 if products[j][1] >= delta:
                     u[j] = 1
-#         print("optimal control", u)
+#         print("optimal control for product ", self.products[j][0], " is ", u, " at period ", t, " for x=", cap_vector)
         return u
                 
     def eval_value(self, t, control, state_num, product_num):
         """helper func: evaluate the value for period t and state x, ref: equation 3.1 in the book"""
+        
         price_vector = [0] * self.n_products
         price_vector[product_num] = self.products[product_num][1]
         value = np.dot(price_vector, control)
@@ -399,50 +385,72 @@ class Network_RM():
     
     def value_func(self):
         """Return the value functions of this problem, calculate it if necessary. """
-        
         self.value_functions = [[0] * self.n_states for _ in range(self.total_time)] 
         for t in range(self.total_time - 1, -1, -1):
+            if self.n_demand_periods > 1:
+                demands = self.demands[t]
+            else:
+                demands = self.demands[0]
             for x in range(self.n_states): 
                 value = 0
                 opt_control = self.optimal_control(x, t)
                 for j in range(self.n_products):
-                    if self.n_demand_periods > 1:
-                        demand = self.demands[t][j]
-                    else: 
-                        demand = self.demands[0][j]
+                    demand = demands[j]
                     j_value = 0
                     if demand > 0:
-                        count_1 = opt_control.count(1)
-                        if count_1 == 0:
-                            j_value = self.eval_value(t, opt_control, x, j)
-                        else:
-                            indicies_1 = [i for i, x in enumerate(opt_control) if x == 1]
-                            index_to_change =  list(map(list, itertools.product([0, 1], repeat=count_1)))
-                            for i in range(2**count_1):
-                            # try the optimal control and all possible sub-optimal controls
-                                sub_control = list(opt_control)
-                                to_change = index_to_change[i] # the indicies to change to get sub-optimal control
-                                change_indicies = [i for i, x in enumerate(to_change) if x == 1]
-                                for index in change_indicies:
-                                    sub_control[indicies_1[index]] = 0
-
-                                if self.check_valid_control(x, sub_control):
-                                    sub_val = self.eval_value(t, sub_control, x, j)
-                                    j_value = max(j_value, sub_val)
+                        u = [0] * self.n_products
+                        u[j] = opt_control[j]
+                        j_value = self.eval_value(t, u, x, j)
+                        
                         value += j_value * demand
+                demand = 1- sum(demands)
+                no_request_val = 0
+                if t < (self.total_time-1):
+                    no_request_val = self.value_functions[t+1][x]
+                value += no_request_val * demand
                 self.value_functions[t][x] = round(value, 3)
-                
+        print("Expected Revenue At Beginning is ", self.value_functions[0][-1])
         return self.value_functions
     
-    def bid_price(self, curr_time):
-        """Calculate the bid prices for resources at the given time."""
-        bid_prices = [0 for _ in range(self.n_states)]
+    def bid_price(self, curr_time, remain_cap):
+        """Calculate the bid prices for resources at the given time, with the remaining capacities for each of them."""
+        bid_prices = [0 for _ in range(self.n_resources)]
+        if curr_time <= 0:
+            raise Warning("Invalid time period given.")
+            return bid_prices
+        
+        if not self.value_functions:
+            self.value_func()
+        
+        for i in range(self.n_resources):
+            bid_price_i = self.value_functions[curr_time - 1][self.state_number(remain_cap)]
+            if remain_cap[i] > 0:
+                prev_cap = remain_cap[:]
+                prev_cap[i] -= 1
+
+                bid_price_i -= self.value_functions[curr_time - 1][self.state_number(prev_cap)]
+            bid_prices[i] = bid_price_i
+        return bid_prices
+    
+    def expected_revenues(self):
+        if not self.value_functions:
+            self.value_func()
+        
+        return [x[-1] for x in self.value_func]
+        
         
 products = [ ['12', 500], ['1', 250], ['2', 250]]
 resources = ['1', '2']
 demands = [[0.4, 0.3, 0.3],[0.8, 0, 0]]
-problem = Network_RM(products, resources, demands, [1,1], 2)
-print(problem.value_func())
+start_time = time.time()
+
+T = 2
+problem = Network_RM(products, resources, demands, [1,1], T)
+vf = problem.value_func()
+for t in range(T):
+    print(vf[t][-1])
+
+print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # In[ ]:
