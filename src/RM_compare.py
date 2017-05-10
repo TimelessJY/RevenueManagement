@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[8]:
+# In[3]:
 
 import pandas
 
@@ -9,6 +9,7 @@ import sys
 sys.path.append('/Users/jshan/Desktop/RevenueManagement')
 from src import RM_exact
 from src import RM_approx
+from src import RM_helper
 
 def compare_single_static(products, demands, cap_lb, cap_ub, cap_interval):
     """Compare the exact DP model with a heuristic, EMSR-b, for static models of single-resource RM problems."""
@@ -38,10 +39,91 @@ products=[[1, 1050], [2,950], [3, 699], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 capacity = 100
 
-compare_single_static(products, demands, 80, 150, 10)
+# compare_single_static(products, demands, 80, 150, 10)
 
 
-# In[7]:
+# In[6]:
+
+
+import time
+def compare_iDAVN_singleDPstatic(products, resources, n_class, cap_lb, cap_ub, cap_interval):
+    """Compare the iterative DAVN method, with a collection of single-resource static DP model."""
+    n_resources = len(resources)
+    col_titles = ['DAVN:bid-p', 'DAVN:rev', 'DAVN:time']
+    capacities = [c for c in range(cap_lb, cap_ub + 1, cap_interval)]
+    for i in range(n_resources):
+            resource_name = resources[i]
+            col_titles.append('S-S: rev-' + resource_name)
+    
+    col_titles.append("S-S: sum")
+    col_titles.append("S-S:total time")
+    
+    table_data = []
+    for cap in capacities:
+        result= []
+        caps = [cap for c in range(n_resources)]
+        (pros, demands, demands_with_names) = RM_helper.sort_product_demands(products)
+        DAVN_time = time.time()
+
+        DAVN_bid_prices, DAVN_total_rev = RM_approx.iterative_DAVN(pros, resources, demands_with_names, n_class,                                                                   caps, caps)
+        DAVN_time = time.time() - DAVN_time
+
+        result.append(DAVN_bid_prices)
+        result.append(DAVN_total_rev)
+        result.append(DAVN_time)
+
+        single_static_vf = []
+        single_total_time =0
+        for i in range(n_resources):
+            resource_name = resources[i]
+            products_i = [j for j in products if resource_name in j[0]]
+    #         print("products for resource " + resource_name + " are: ", products_i)
+            ps, ds, _ = RM_helper.sort_product_demands(products_i)
+            
+            single_time = time.time()
+            problem = RM_exact.Single_RM_static(ps, ds, capacities[i])
+            vf_i = problem.value_func()
+            single_time = time.time() - single_time
+            single_total_time += single_time
+            
+            single_static_vf.append(vf_i[0][-1][-1])
+    #         print("products: ", ps, ds, ", value =", vf_i)
+            result.append(vf_i[0][-1][-1])
+        result.append(sum(single_static_vf))
+        result.append(single_total_time)
+        
+        table_data.append(result)
+    
+    print(pandas.DataFrame(table_data, capacities, col_titles))
+
+
+# Compare
+products = [['1a', (17.3, 5.8), 1050], ['2a', (45.1, 15.0),950], ['3a', (39.6, 13.2), 699], ['4a', (34.0, 11.3),520],            ['1b', (20, 3.5), 501], ['2b', (63.1, 2.5), 352], ['3b', (22.5, 6.1), 722], ['1ab', (11.5, 2.1), 760],            ['2ab', (24.3, 6.4), 1400]]
+resources = ['a', 'b']
+compare_iDAVN_singleDPstatic(products,resources, 6, 80, 120, 10)
+
+
+# In[14]:
+
+# Draw the graph of running time of the network_DP model
+import numpy as np
+import matplotlib.pyplot as plt
+
+x = np.linspace(1, 8, 8)
+y = [0.527467727,5.557183,30.04833006,113.901170,347.9840,879.96475,1961.55373,4324.17709]
+# plt.plot(x)
+plt.plot(x,y, 'bo-')
+plt.ylabel('Running Time (sec)')
+plt.xlabel('Resource Capacity')
+plt.show()
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
 
 
 

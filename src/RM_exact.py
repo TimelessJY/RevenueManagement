@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[8]:
+# In[1]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -31,7 +31,7 @@ class Single_RM_static():
         To be calculated:
         ----------
         value_functions: 2D np array
-            contains value function, ranged over time periods and remaining capacity
+            contains value function, ranged over products and remaining capacity
             size n_products * (capacity + 1)
         protection_levels: 2D np array
             contains the time-dependent optimal protection level for each class
@@ -74,6 +74,7 @@ class Single_RM_static():
                     if prob_dj > 0:
                         if j > 0:
                             u = min(dj, max(x-self.protection_levels[j-1], 0))
+#                             print("for j=",j,"x=", x, "u =", u)
                             max_val = self.products[j][1] * u + self.value_functions[j-1][x-u]
                         else:
                             u = min(dj, x)
@@ -93,15 +94,16 @@ class Single_RM_static():
 #               ", with protection levels=", self.protection_levels) 
         return (self.value_functions, self.protection_levels)
 
+
+
+start_time = time.time()
 # Examples, ref: example 2.3, 2.4 in "The Theory and Practice of Revenue Management"
 products = [[1, 1050], [2,567], [3, 534], [4,520]]
 # products = [[1, 1050], [2,950], [3, 699], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
-
-problem1 = Single_RM_static(products, demands, 80)
-start_time = time.time()
-
-vc = problem.value_func()
+cap = 70
+problem = Single_RM_static(products, demands, cap)
+vf = problem.value_func()
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
@@ -212,12 +214,16 @@ problem = Single_RM_dynamic(products, demands, 3, 3)
 print(problem.value_func())
 
 
-# In[7]:
+# In[19]:
 
-############################## 
+##############################
 ###### Network_RM DP ######### 
 ##############################
 import itertools
+
+import sys
+sys.path.append('/Users/jshan/Desktop/RevenueManagement')
+from src import RM_helper
 
 class Network_RM():
     """Solve a multi-resource(network) revenue management problem using Dynamic Programming model,
@@ -439,16 +445,45 @@ class Network_RM():
         return [x[-1] for x in self.value_func]
         
         
-products = [ ['12', 500], ['1', 250], ['2', 250]]
-resources = ['1', '2']
-demands = [[0.4, 0.3, 0.3],[0.8, 0, 0]]
+# products = [ ['12', 500], ['1', 250], ['2', 250]]
+# resources = ['1', '2']
+# # demands = [[0.4, 0.3, 0.3],[0.8, 0, 0]]
+# demands = [[0.4, 0.3, 0.3]]
+
+# products = [['abc', 1000], ['bcd', 1000], ['ab', 100], ['cd', 100]]
+# resources = ['ab', 'bc', 'cd']
+# demands = [[0,0,0.5,0.5],[0.5,0.5,0,0]]
+
+
+# products = [['a1', 802], ['b2', 722], ['c3', 520], ['c4', 501], ['b3', 490], ['a3', 459], ['c2', 441], \
+# ['c1', 398], ['b1', 377],['a2', 325], ['a4', 274]]
+# resources = ['a', 'b', 'c']
+# demands = [[0.05, 0.02, 0.11, 0.07, 0.16, 0.13, 0.1, 0.15, 0.02, 0.08, 0.1]]
+
+
 start_time = time.time()
 
-T = 2
-problem = Network_RM(products, resources, demands, [1,1], T)
+# ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601], ['b2', 0.12, 106],\
+#             ['bc', 0.03, 920],['c1', 0.07, 832],['d1', 0.14, 397], ['d2',  0.18, 533], ['ad', 0.09, 935], \
+#       ['ae', 0.013, 205],['f3', 0.004, 589], ['fb', 0.009, 422]]
+# products,demands, _ = RM_helper.sort_product_demands(ps)
+# resources = ['a', 'b', 'c', 'd', 'e', 'f']
+
+ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
+products,demands, _ = RM_helper.sort_product_demands(ps)
+resources = ['a', 'b', 'c']
+
+T = 10
+cap = [8] * 3
+problem = Network_RM(products, resources, [demands], cap, T)
+
+# T = 2
+# problem = Network_RM(products, resources, demands, [1,1], T)
 vf = problem.value_func()
 for t in range(T):
     print(vf[t][-1])
+# print(vf)
+# print(problem.bid_price(1, [1,1,1]))
 
 print("--- %s seconds ---" % (time.time() - start_time))
 

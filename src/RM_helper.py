@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[8]:
+# In[1]:
 
 def sort_product_demands(products):
     """
@@ -10,10 +10,12 @@ def sort_product_demands(products):
     """
     n_products = len(products)
     demands = []
+    demands_with_name = []
     products.sort(key = lambda tup: tup[2], reverse=True)
     demands = [p[1] for p in products]
+    demands_with_name = [[p[0], p[1]] for p in products]
     products = [[p[0], p[2]] for p in products]
-    return products, demands
+    return (products, demands, demands_with_name)
 
 def marginal_value_check(value_func):
     """checks whether the marginal values in computed value functions satisfy the proposition 2.21"""
