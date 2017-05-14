@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[45]:
+# In[11]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -217,7 +217,7 @@ problem = Single_RM_dynamic(products, demands, 3, 3)
 print(problem.value_func())
 
 
-# In[8]:
+# In[16]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -294,20 +294,9 @@ class Network_RM():
         for j in range(self.n_products-1):
             if products[j][1] < products[j+1][1]:
                 raise ValueError('The products are not in the descending order of their revenues.')
-        
-        self.calc_incidence_matrix()
+            
+        self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
         self.calc_number_of_state()
-        
-        
-    def calc_incidence_matrix(self):
-        """Constructs the incidence matrix, such that A[i][j] = 1 if product j uses resource i, 0 otherwise"""
-        
-        self.incidence_matrix = [[0] * self.n_products for _ in range(self.n_resources)] 
-    
-        for i in range(self.n_resources):
-            for j in range(self.n_products):
-                if self.resources[i] in self.products[j][0]: # test if product j uses resource i
-                    self.incidence_matrix[i][j] = 1
         
     def calc_number_of_state(self):
         """Calculates the number of states in this problem"""
@@ -488,6 +477,20 @@ for t in range(T):
 # print(vf)
 # print(problem.bid_price(1, [1,1,1]))
 
+print("--- %s seconds ---" % (time.time() - start_time))
+
+
+# In[15]:
+
+start_time = time.time()
+products = [ ['12', 500], ['1', 250], ['2', 250]]
+resources = ['1', '2']
+demands = [[0.4, 0.2, 0.3]]
+
+capacities=[4,4]
+problem = Network_RM(products, resources, demands, capacities, 2)
+vf = problem.value_func()
+print(vf)
 print("--- %s seconds ---" % (time.time() - start_time))
 
 

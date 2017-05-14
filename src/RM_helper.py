@@ -31,6 +31,22 @@ def marginal_value_check(value_func):
             if any(delta_V[i] > delta_V_next[i] for i in range(len(delta_V))):
                 print("error type 2")
 
+def calc_incidence_matrix(products, resources):
+    """constructs the incidence matrix, indicating which product uses which resources, 
+        e.g. incidence_matrix[i][j] = 1 if product j uses resource i
+        size n_resources * n_products"""
+    
+    n_products = len(products)
+    n_resources = len(resources)
+
+    incidence_matrix = [[0] * n_products for _ in range(n_resources)] 
+
+    for i in range(n_resources):
+        for j in range(n_products):
+            if resources[i] in products[j][0]: # test if product j uses resource i
+                incidence_matrix[i][j] = 1
+    return incidence_matrix
+
 
 # In[ ]:
 

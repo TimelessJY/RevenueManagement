@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[123]:
+# In[6]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -114,7 +114,7 @@ class Single_EMSR():
         for j in range(self.n_products):
             for x in range(self.capacity + 1):
                 
-                normal_distr = scipy.stats.norm(self.demands[j]
+                normal_distr = scipy.stats.norm(self.demands[j])
                 dj = 0
                 while normal_distr.pdf(dj) > 1e-5:
                     prob_dj = normal_distr.pdf(dj)
@@ -139,7 +139,7 @@ problem = Single_EMSR(products, demands, 80)
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[3]:
+# In[7]:
 
 ##############################
 ###### Single_DCM ############
@@ -341,7 +341,7 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[4]:
+# In[10]:
 
 ##############################
 ###### network_DAVN ##########
@@ -422,17 +422,7 @@ class Network_DAVN():
                 self.products.sort(key = lambda tup: tup[1], reverse=True)
                 break
             
-        self.calc_incidence_matrix()
-    
-    def calc_incidence_matrix(self):
-        """helper func: constructs the incidence matrix"""
-        
-        self.incidence_matrix = [[0] * self.n_products for _ in range(self.n_resources)] 
-    
-        for i in range(self.n_resources):
-            for j in range(self.n_products):
-                if self.resources[i] in self.products[j][0]: # test if product j uses resource i
-                    self.incidence_matrix[i][j] = 1
+        self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
     
     def calc_displacement_adjusted_revenue(self, static_bid_prices):
         """
@@ -697,18 +687,18 @@ def iterative_DAVN(products, resources, demands, n_virtual_class, capacities, re
     """
     Parameter
     ----------
-    products: np array
-        contains products, each in the form of [name, probabilities, revenue], size n_products
+    products: 2D np array
+            contains products, each represented in the form of [product_name, expected_revenue], 
+            ordered in descending order of revenue
+            size n_products * 2
     resources: np array
         contains names of resources, size n_resources
-    demands: np array
-        contains the demand for each product, size n_products
-    n_virtual_class: integer
-        the number of virtual classes to partition the products into
-    mean_demands: np array
-        contains mean demands of products, in the form of [product_name, mean_demand], size n_products
+    demands: 2D np array
+        contains the mean demands and std for products, each in the form of (product_name, [mean_demand, std])
+        size n_products * 3 (assume the requests are time-independent), 
     capacities: np array
-        contains the capacity for each resource, size n_resources
+        contains the capacity for each resource
+        size n_resources
    
     Returns
     -------
@@ -767,39 +757,30 @@ capacities = [130,130]
 iterative_DAVN(products, resources, demands, 1, capacities, capacities)
 
 
-# In[83]:
-
-from cvxopt import matrix, solvers,glpk
-c = matrix([-4., -5.])
-G = matrix([[2., 1., -1., 0.], [1., 2., 0., -1.]])
-h = matrix([3., 3., 0., 0.])
-sol = solvers.lp(c, G, h)
-print(sol['x'])
-# [ 1.00e+00]
-# [ 1.00e+00]
-
-
-# In[114]:
+# In[18]:
 
 ##############################
 ###### network_DLP ###########
 ##############################
+import cvxopt
+from cvxopt import matrix, solvers, glpk
 
-
-def calc_incidence_matrix(products, resources):
-        """helper func: constructs the incidence matrix"""
-        n_products = len(products)
-        n_resources = len(resources)
-        
-        incidence_matrix = [[0] * n_products for _ in range(n_resources)] 
-    
-        for i in range(n_resources):
-            for j in range(n_products):
-                if resources[i] in products[j][0]: # test if product j uses resource i
-                    incidence_matrix[i][j] = 1
-        return incidence_matrix
-    
 def network_DLP(products, resources, demands, capacities):
+    """Solve a multiple-resource revenue management problem using Deterministic Linear Programming.
+        Given:
+        ----------
+        products: 2D np array
+            contains products, each represented in the form of [product_name, expected_revenue], 
+            ordered in descending order of revenue
+            size n_products * 2
+        demands: 2D np array
+            contains the mean and std of the demand distribution for each product
+            size total_time * n_products
+        capacity: integer
+            the total capacity C, remaining capacity x ranges from 0 to C
+        total_time: integer
+            the max time period T, time period t ranges from 1 to T
+    """
     n_products = len(products)
     n_resources = len(resources)
         
@@ -810,7 +791,7 @@ def network_DLP(products, resources, demands, capacities):
         D = [d[0] for d in demands[0]]
         mu = D
     
-    A = calc_incidence_matrix(products, resources)
+    A = RM_helper.calc_incidence_matrix(products, resources)
     c = matrix([-float(product[1]) for product in products])
     h = np.array(capacities + [0] * n_products + mu).astype(float)
     h = matrix(h)
@@ -840,8 +821,6 @@ def helper_row_G(A, i, n_products):
     row3 = [0] * n_products
     row3[i] = 1
     return row1+row2+row3
-    
-    
     
 products = [['1a', (17.3, 5.8), 1050], ['2a', (45.1, 15.0),950], ['3a', (39.6, 13.2), 699], ['4a', (34.0, 11.3),520],            ['1b', (20, 3.5), 501], ['2b', (63.1, 2.5), 352], ['3b', (22.5, 6.1), 722], ['1ab', (11.5, 2.1), 760],            ['2ab', (24.3, 6.4), 1400]]
 
