@@ -81,7 +81,7 @@ plt.plot(x, y_diff, 'ro-')
 plt.show()
 
 
-# In[2]:
+# In[7]:
 
 
 import time
@@ -158,6 +158,15 @@ line2, = plt.plot(x,revs_singleDP, marker='o', label='Single_Static_DP')
 plt.legend(handler_map={line1: HandlerLine2D(numpoints=1),line2: HandlerLine2D(numpoints=1)})
 # legend = ax.legend(loc='upper center')
 plt.ylabel('Expected Revenue')
+plt.xlabel('Resource Capacity')
+plt.show()
+
+line3, = plt.plot(x,time_DAVN, marker='^', label='DAVN')
+line4, = plt.plot(x,time_singleDP, marker='o', label='Single_Static_DP')
+
+plt.legend(handler_map={line1: HandlerLine2D(numpoints=1),line2: HandlerLine2D(numpoints=1)})
+# legend = ax.legend(loc='upper center')
+plt.ylabel('Running Time')
 plt.xlabel('Resource Capacity')
 plt.show()
 
