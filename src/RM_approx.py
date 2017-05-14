@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[6]:
+# In[1]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -13,8 +13,8 @@ import scipy.stats
 import time
 import math
 import sys
-sys.path.append('/Users/jshan/Desktop/RevenueManagement')
-from src import RM_helper
+sys.path.append('.')
+import RM_helper
 
 class Single_EMSR():
     """Solve a single resource revenue management problem (static model) using EMSR heuristic,
@@ -144,9 +144,6 @@ print("--- %s seconds ---" % (time.time() - start_time))
 ##############################
 ###### Single_DCM ############
 ##############################
-
-import warnings
-import numpy as np
 
 # Solves single-resource capacity control, using Discrete Choice Models.
 # ref: The Theory and Practice of Revenue Management, section 2.6.2
@@ -341,15 +338,12 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[10]:
+# In[2]:
 
 ##############################
 ###### network_DAVN ##########
 ##############################
-
-import sys
-sys.path.append('/Users/jshan/Desktop/RevenueManagement')
-from src import RM_exact
+import RM_exact
 
 class Network_DAVN():
     """Solve a multi-resource(network) revenue management problem using DAVN method,
@@ -757,7 +751,7 @@ capacities = [130,130]
 iterative_DAVN(products, resources, demands, 1, capacities, capacities)
 
 
-# In[18]:
+# In[3]:
 
 ##############################
 ###### network_DLP ###########

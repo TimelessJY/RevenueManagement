@@ -6,15 +6,14 @@
 import pandas
 
 import sys
-sys.path.append('/Users/jshan/Desktop/RevenueManagement')
-from src import RM_exact
-from src import RM_approx
-from src import RM_helper
+sys.path.append('.')
+import RM_exact
+import RM_approx
+import RM_helper
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.legend_handler import HandlerLine2D
-
 
 def compare_single_static(products, demands, cap_lb, cap_ub, cap_interval):
     """Compare the exact DP model with a heuristic, EMSR-b, for static models of single-resource RM problems."""

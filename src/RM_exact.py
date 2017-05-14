@@ -217,7 +217,7 @@ problem = Single_RM_dynamic(products, demands, 3, 3)
 print(problem.value_func())
 
 
-# In[16]:
+# In[1]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -225,8 +225,8 @@ print(problem.value_func())
 import itertools
 
 import sys
-sys.path.append('/Users/jshan/Desktop/RevenueManagement')
-from src import RM_helper
+sys.path.append('.')
+import RM_helper
 
 class Network_RM():
     """Solve a multi-resource(network) revenue management problem using Dynamic Programming model,
