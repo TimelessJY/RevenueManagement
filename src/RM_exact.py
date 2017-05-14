@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[45]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -58,6 +58,7 @@ class Single_RM_static():
                 raise ValueError('The products are not in the descending order of their revenues.')
         
     
+    
     def value_func(self):
         """Calculate the value functions of this problem and the protection levels for the products."""
         
@@ -69,20 +70,21 @@ class Single_RM_static():
                 normal_distr = scipy.stats.norm(self.demands[j][0], self.demands[j][1])
                 
                 val = 0
-                for dj in range(self.capacity + 1):
+                dj = 0
+                while normal_distr.pdf(dj) > 1e-5:
                     prob_dj = normal_distr.pdf(dj)
-                    if prob_dj > 0:
-                        if j > 0:
-                            u = min(dj, max(x-self.protection_levels[j-1], 0))
-#                             print("for j=",j,"x=", x, "u =", u)
-                            max_val = self.products[j][1] * u + self.value_functions[j-1][x-u]
-                        else:
-                            u = min(dj, x)
-                            max_val = self.products[j][1] * u
+                    if j > 0:
+                        u = min(dj, max(x-self.protection_levels[j-1], 0))
+                        max_val = self.products[j][1] * u + self.value_functions[j-1][x-u]
+                    else:
+                        u = min(dj, x)
+                        max_val = self.products[j][1] * u
                         
-                        val += prob_dj * max_val
+                    val += prob_dj * max_val
+                    dj += 1
                 
                 self.value_functions[j][x] = val
+                
                 
             # calculates protection levels for the current fare class    
             if j < (self.n_products - 1):
@@ -101,9 +103,10 @@ start_time = time.time()
 products = [[1, 1050], [2,567], [3, 534], [4,520]]
 # products = [[1, 1050], [2,950], [3, 699], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
-cap = 70
+cap = 80
 problem = Single_RM_static(products, demands, cap)
 vf = problem.value_func()
+print(vf)
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
@@ -214,7 +217,7 @@ problem = Single_RM_dynamic(products, demands, 3, 3)
 print(problem.value_func())
 
 
-# In[19]:
+# In[8]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -374,8 +377,8 @@ class Network_RM():
         price_vector[product_num] = self.products[product_num][1]
         value = np.dot(price_vector, control)
         Au = np.dot(self.incidence_matrix, control).tolist()
-        x_Au = [x_i - Au_i for x_i, Au_i in zip(self.remain_cap(state_num), Au)]
         if t < self.total_time - 1:
+            x_Au = [x_i - Au_i for x_i, Au_i in zip(self.remain_cap(state_num), Au)]
             state_x_Au = self.state_number(x_Au)
             value += self.value_functions[t+1][self.state_number(x_Au)]
         return value

@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[3]:
+# In[9]:
 
 import pandas
 
@@ -10,6 +10,11 @@ sys.path.append('/Users/jshan/Desktop/RevenueManagement')
 from src import RM_exact
 from src import RM_approx
 from src import RM_helper
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.legend_handler import HandlerLine2D
+
 
 def compare_single_static(products, demands, cap_lb, cap_ub, cap_interval):
     """Compare the exact DP model with a heuristic, EMSR-b, for static models of single-resource RM problems."""
@@ -32,17 +37,52 @@ def compare_single_static(products, demands, cap_lb, cap_ub, cap_interval):
         result.append([round(dp_rev, 2), dp_result[1],round(approx_rev, 2), approx_result[1],                       "{0:.3f}%".format(sub_optimal)])
     
     print(pandas.DataFrame(result, capacities, col_titles))
+    return result
 
 # Examples, ref: example 2.3, 2.4 in "The Theory and Practice of Revenue Management"
-# products = [[1, 1050], [2,567], [3, 534], [4,520]]
-products=[[1, 1050], [2,950], [3, 699], [4,520]]
+products = [[1, 1050], [2,567], [3, 534], [4,520]]
+# products=[[1, 1050], [2,950], [3, 699], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
-capacity = 100
+lb = 80
+ub = 170
+result = compare_single_static(products, demands, lb, ub, 10)
+x = np.linspace(lb, ub, 10)
+y1 = [r[0] for r in result]
+y2 = [r[2] for r in result]
+# plt.plot(x)
+# plt.plot(x,y1, 'g^', x, y2, 'bs')
+# plt.ylabel('Expected Revenue')
+# plt.xlabel('Resource Capacity')
 
-# compare_single_static(products, demands, 80, 150, 10)
 
 
-# In[6]:
+line1, = plt.plot(x,y1, marker='^', label='DP Model')
+line2, = plt.plot(x,y2, marker='o', label='EMSR-b')
+
+plt.legend(handler_map={line1: HandlerLine2D(numpoints=1),line2: HandlerLine2D(numpoints=1)})
+# legend = ax.legend(loc='upper center')
+plt.ylabel('Expected Revenue')
+plt.xlabel('Resource Capacity')
+plt.show()
+
+
+
+
+
+
+# In[11]:
+
+
+x = np.linspace(lb, ub, 10)
+y_diff = [float(r[4].strip('%')) for r in result]
+plt.ylabel('Revenue Difference (%)')
+plt.xlabel('Resource Capacity')
+plt.plot(x, y_diff, 'ro-')
+
+plt.show()
+
+
+# In[3]:
 
 
 import time
@@ -100,10 +140,11 @@ def compare_iDAVN_singleDPstatic(products, resources, n_class, cap_lb, cap_ub, c
 # Compare
 products = [['1a', (17.3, 5.8), 1050], ['2a', (45.1, 15.0),950], ['3a', (39.6, 13.2), 699], ['4a', (34.0, 11.3),520],            ['1b', (20, 3.5), 501], ['2b', (63.1, 2.5), 352], ['3b', (22.5, 6.1), 722], ['1ab', (11.5, 2.1), 760],            ['2ab', (24.3, 6.4), 1400]]
 resources = ['a', 'b']
-compare_iDAVN_singleDPstatic(products,resources, 6, 80, 120, 10)
+# compare_iDAVN_singleDPstatic(products,resources, 6, 80, 120, 10)
+compare_iDAVN_singleDPstatic(products, resources, 2, 30, 40, 10)
 
 
-# In[14]:
+# In[4]:
 
 # Draw the graph of running time of the network_DP model
 import numpy as np
@@ -118,7 +159,7 @@ plt.xlabel('Resource Capacity')
 plt.show()
 
 
-# In[ ]:
+# In[10]:
 
 
 

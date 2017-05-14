@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[123]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -114,14 +114,15 @@ class Single_EMSR():
         for j in range(self.n_products):
             for x in range(self.capacity + 1):
                 
-                normal_distr = scipy.stats.norm(self.demands[j][0], self.demands[j][1])
-                val = 0
-                for dj in range(self.capacity + 1):
+                normal_distr = scipy.stats.norm(self.demands[j]
+                dj = 0
+                while normal_distr.pdf(dj) > 1e-5:
                     prob_dj = normal_distr.pdf(dj)
-                    if prob_dj > 0:                        
-                        val += prob_dj * self.calc_val(x, j, dj)
+                    val += prob_dj * self.calc_val(x,j,dj)
+                    dj += 1
                 
                 self.value_functions[j][x] = val
+
 #         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity], \
 #               ", with protection levels=", self.protection_levels) 
         return (self.value_functions, self.protection_levels)
@@ -131,10 +132,9 @@ start_time = time.time()
 products = [[1, 1050], [2,567], [3, 534], [4,520]]
 # products = [[1, 1050], [2,950], [3, 699], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
-problem = Single_EMSR(products, demands, 5)
+problem = Single_EMSR(products, demands, 80)
 # result = problem.value_func()
 # print(result)
-# RM_helper.marginal_value_check(result[0])
 
 print("--- %s seconds ---" % (time.time() - start_time))
 
@@ -767,9 +767,91 @@ capacities = [130,130]
 iterative_DAVN(products, resources, demands, 1, capacities, capacities)
 
 
-# In[ ]:
+# In[83]:
+
+from cvxopt import matrix, solvers,glpk
+c = matrix([-4., -5.])
+G = matrix([[2., 1., -1., 0.], [1., 2., 0., -1.]])
+h = matrix([3., 3., 0., 0.])
+sol = solvers.lp(c, G, h)
+print(sol['x'])
+# [ 1.00e+00]
+# [ 1.00e+00]
 
 
+# In[114]:
+
+##############################
+###### network_DLP ###########
+##############################
+
+
+def calc_incidence_matrix(products, resources):
+        """helper func: constructs the incidence matrix"""
+        n_products = len(products)
+        n_resources = len(resources)
+        
+        incidence_matrix = [[0] * n_products for _ in range(n_resources)] 
+    
+        for i in range(n_resources):
+            for j in range(n_products):
+                if resources[i] in products[j][0]: # test if product j uses resource i
+                    incidence_matrix[i][j] = 1
+        return incidence_matrix
+    
+def network_DLP(products, resources, demands, capacities):
+    n_products = len(products)
+    n_resources = len(resources)
+        
+    if len(demands) > 1:
+        D = [[sum(d[j][0]) for d in demands] for j in range(n_products)]
+        mu = [d/len(demands) for d in D]
+    else:
+        D = [d[0] for d in demands[0]]
+        mu = D
+    
+    A = calc_incidence_matrix(products, resources)
+    c = matrix([-float(product[1]) for product in products])
+    h = np.array(capacities + [0] * n_products + mu).astype(float)
+    h = matrix(h)
+    G = [0] * n_products
+    for i in range(n_products):
+        row = helper_row_G(A, i, n_products)
+        G[i] = row
+    G = np.asarray(G).astype(float).tolist()
+    G = matrix(G)
+    cvxopt.solvers.options['show_progress'] = False
+    sol = solvers.lp(c, G, h)
+    print(sol['x'])
+    print("sol1:val=",sol['primal objective'])
+    print("sol1:dual_sol=", sol['dual objective'])
+    print("sol1:dual_var=", sol['z'])
+    
+    print("int solutions:")
+    integer_index = [i for i in range(n_products)]
+    (status, x) = glpk.ilp(c,G,h, I=set(integer_index))
+    int_sol=np.array(x)
+    print("value=", round((c.T*x)[0], 2))
+    
+def helper_row_G(A, i, n_products):
+    row1 = [a[i] for a in A]
+    row2 = [0] * n_products
+    row2[i] = -1
+    row3 = [0] * n_products
+    row3[i] = 1
+    return row1+row2+row3
+    
+    
+    
+products = [['1a', (17.3, 5.8), 1050], ['2a', (45.1, 15.0),950], ['3a', (39.6, 13.2), 699], ['4a', (34.0, 11.3),520],            ['1b', (20, 3.5), 501], ['2b', (63.1, 2.5), 352], ['3b', (22.5, 6.1), 722], ['1ab', (11.5, 2.1), 760],            ['2ab', (24.3, 6.4), 1400]]
+
+resources = ['a', 'b']
+capacities = [30,30]
+np.set_printoptions(threshold='nan')
+(pros, demands, demands_with_names) = RM_helper.sort_product_demands(products)
+# print(pros)
+# print(demands)
+network_DLP(pros, resources, [demands], capacities)
 
 
 # In[ ]:
