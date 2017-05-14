@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[9]:
+# In[1]:
 
 import pandas
 
@@ -81,7 +81,7 @@ plt.plot(x, y_diff, 'ro-')
 plt.show()
 
 
-# In[3]:
+# In[2]:
 
 
 import time
@@ -134,13 +134,32 @@ def compare_iDAVN_singleDPstatic(products, resources, n_class, cap_lb, cap_ub, c
         table_data.append(result)
     
     print(pandas.DataFrame(table_data, capacities, col_titles))
+    return table_data
 
 
 # Compare
 products = [['1a', (17.3, 5.8), 1050], ['2a', (45.1, 15.0),950], ['3a', (39.6, 13.2), 699], ['4a', (34.0, 11.3),520],            ['1b', (20, 3.5), 501], ['2b', (63.1, 2.5), 352], ['3b', (22.5, 6.1), 722], ['1ab', (11.5, 2.1), 760],            ['2ab', (24.3, 6.4), 1400]]
 resources = ['a', 'b']
 # compare_iDAVN_singleDPstatic(products,resources, 6, 80, 120, 10)
-compare_iDAVN_singleDPstatic(products, resources, 2, 30, 40, 10)
+lb = 30
+ub = 40
+data = compare_iDAVN_singleDPstatic(products, resources, 2, lb, ub, 10)
+
+revs_DAVN = [d[1] for d in data]
+revs_singleDP = [d[5] for d in data]
+time_DAVN = [d[2] for d in data]
+time_singleDP = [d[6] for d in data]
+
+x= np.linspace(lb, ub, (ub - lb) / 10 + 1)
+
+line1, = plt.plot(x,revs_DAVN, marker='^', label='DAVN')
+line2, = plt.plot(x,revs_singleDP, marker='o', label='Single_Static_DP')
+
+plt.legend(handler_map={line1: HandlerLine2D(numpoints=1),line2: HandlerLine2D(numpoints=1)})
+# legend = ax.legend(loc='upper center')
+plt.ylabel('Expected Revenue')
+plt.xlabel('Resource Capacity')
+plt.show()
 
 
 # In[4]:

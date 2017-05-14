@@ -113,8 +113,8 @@ class Single_EMSR():
         
         for j in range(self.n_products):
             for x in range(self.capacity + 1):
-                
-                normal_distr = scipy.stats.norm(self.demands[j])
+                val = 0
+                normal_distr = scipy.stats.norm(self.demands[j][0],self.demands[j][1])
                 dj = 0
                 while normal_distr.pdf(dj) > 1e-5:
                     prob_dj = normal_distr.pdf(dj)
@@ -132,14 +132,14 @@ start_time = time.time()
 products = [[1, 1050], [2,567], [3, 534], [4,520]]
 # products = [[1, 1050], [2,950], [3, 699], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
-problem = Single_EMSR(products, demands, 80)
+# problem = Single_EMSR(products, demands, 80)
 # result = problem.value_func()
 # print(result)
 
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[7]:
+# In[2]:
 
 ##############################
 ###### Single_DCM ############
@@ -338,7 +338,7 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[2]:
+# In[15]:
 
 ##############################
 ###### network_DAVN ##########
@@ -614,6 +614,7 @@ class Network_DAVN():
                 
             if mean_demand > 0:
                 rev /= mean_demand
+            mean_demand /= partition_indicies[p] - start_index
             
             start_index = partition_indicies[p]
             virtual_classes.append([names, round(rev, 3)])
@@ -640,6 +641,7 @@ class Network_DAVN():
         if len(static_price) != self.n_resources:
             raise ValueError('Static bid prices size not as expected')
         
+#         print("received products, r, d = ", self.products, self.resources, self.demands)
         self.value_functions = []
         self.calc_displacement_adjusted_revenue(static_price)
         self.clustering()
@@ -663,12 +665,12 @@ static_price = [0, 0]
 # capacities = [130,130]
 capacities = [60, 60]
 
-davn_prob = Network_DAVN(products, resources, demands, capacities,n_virtual_class)
-vf = davn_prob.calc_value_function(static_price)
-print(vf)
+# davn_prob = Network_DAVN(products, resources, demands, capacities,n_virtual_class)
+# vf = davn_prob.calc_value_function(static_price)
+# print(vf)
 
 
-# In[5]:
+# In[14]:
 
 ##############################
 ###### iterative_DAVN ########
@@ -751,7 +753,7 @@ capacities = [130,130]
 iterative_DAVN(products, resources, demands, 1, capacities, capacities)
 
 
-# In[3]:
+# In[5]:
 
 ##############################
 ###### network_DLP ###########
@@ -824,7 +826,7 @@ np.set_printoptions(threshold='nan')
 (pros, demands, demands_with_names) = RM_helper.sort_product_demands(products)
 # print(pros)
 # print(demands)
-network_DLP(pros, resources, [demands], capacities)
+# network_DLP(pros, resources, [demands], capacities)
 
 
 # In[ ]:
