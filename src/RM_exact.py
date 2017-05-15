@@ -1,16 +1,26 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
-##############################
-###### Single_RM DP ##########
-##############################
 import warnings
 import numpy as np
 from operator import itemgetter
 import scipy.stats
 import time
+from operator import itemgetter
+import itertools
+
+import sys
+sys.path.append('.')
+import RM_helper
+
+
+# In[3]:
+
+##############################
+###### Single_RM DP ##########
+##############################
 
 class Single_RM_static():
     """Solve a single resource revenue management problem (static model) using Dynamic Programming model, 
@@ -71,7 +81,7 @@ class Single_RM_static():
                 
                 val = 0
                 dj = 0
-                while normal_distr.pdf(dj) > 1e-5:
+                while (normal_distr.pdf(dj) > 1e-5) or (dj < self.demands[j][0]):
                     prob_dj = normal_distr.pdf(dj)
                     if j > 0:
                         u = min(dj, max(x-self.protection_levels[j-1], 0))
@@ -93,8 +103,9 @@ class Single_RM_static():
                         self.protection_levels[j] = x
                         break
 #         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity], \
-#               ", with protection levels=", self.protection_levels) 
-        return (self.value_functions, self.protection_levels)
+#               ", with protection levels=", self.protection_levels)
+            bid_prices = [v[-1] - v[-2] for v in self.value_functions]
+        return (self.value_functions, self.protection_levels, bid_prices)
 
 
 
@@ -105,17 +116,16 @@ products = [[1, 1050], [2,567], [3, 534], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 cap = 80
 problem = Single_RM_static(products, demands, cap)
-vf = problem.value_func()
-print(vf)
+# vf = problem.value_func()
+# print(vf)
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[3]:
+# In[4]:
 
 ##############################
 ###### Single_RM DP ##########
 ##############################
-from operator import itemgetter
 
 class Single_RM_dynamic():
     """Solve a single resource revenue management problem (dynamic model) using Dynamic Programming model, 
@@ -213,20 +223,15 @@ class Single_RM_dynamic():
 
 products = [1, 30], [2, 25], [3, 12], [4, 4]
 demands = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
-problem = Single_RM_dynamic(products, demands, 3, 3)
-print(problem.value_func())
+# problem = Single_RM_dynamic(products, demands, 3, 3)
+# print(problem.value_func())
 
 
-# In[1]:
+# In[5]:
 
 ##############################
 ###### Network_RM DP ######### 
 ##############################
-import itertools
-
-import sys
-sys.path.append('.')
-import RM_helper
 
 class Network_RM():
     """Solve a multi-resource(network) revenue management problem using Dynamic Programming model,
@@ -352,9 +357,9 @@ class Network_RM():
             if all(diff_i >= 0 for diff_i in diff):
                 delta = 0
                 if t < self.total_time - 1:
-                    delta = self.value_functions[t+1][state_num] - self.value_functions[t+1][self.state_number(diff)]
+                    delta = self.value_functions[t+1][state_num] -                     self.value_functions[t+1][self.state_number(diff)]
                 
-                if products[j][1] >= delta:
+                if self.products[j][1] >= delta:
                     u[j] = 1
 #         print("optimal control for product ", self.products[j][0], " is ", u, " at period ", t, " for x=", cap_vector)
         return u
@@ -435,23 +440,6 @@ class Network_RM():
             self.value_func()
         
         return [x[-1] for x in self.value_func]
-        
-        
-# products = [ ['12', 500], ['1', 250], ['2', 250]]
-# resources = ['1', '2']
-# # demands = [[0.4, 0.3, 0.3],[0.8, 0, 0]]
-# demands = [[0.4, 0.3, 0.3]]
-
-# products = [['abc', 1000], ['bcd', 1000], ['ab', 100], ['cd', 100]]
-# resources = ['ab', 'bc', 'cd']
-# demands = [[0,0,0.5,0.5],[0.5,0.5,0,0]]
-
-
-# products = [['a1', 802], ['b2', 722], ['c3', 520], ['c4', 501], ['b3', 490], ['a3', 459], ['c2', 441], \
-# ['c1', 398], ['b1', 377],['a2', 325], ['a4', 274]]
-# resources = ['a', 'b', 'c']
-# demands = [[0.05, 0.02, 0.11, 0.07, 0.16, 0.13, 0.1, 0.15, 0.02, 0.08, 0.1]]
-
 
 start_time = time.time()
 
@@ -477,20 +465,6 @@ for t in range(T):
 # print(vf)
 # print(problem.bid_price(1, [1,1,1]))
 
-print("--- %s seconds ---" % (time.time() - start_time))
-
-
-# In[15]:
-
-start_time = time.time()
-products = [ ['12', 500], ['1', 250], ['2', 250]]
-resources = ['1', '2']
-demands = [[0.4, 0.2, 0.3]]
-
-capacities=[4,4]
-problem = Network_RM(products, resources, demands, capacities, 2)
-vf = problem.value_func()
-print(vf)
 print("--- %s seconds ---" % (time.time() - start_time))
 
 

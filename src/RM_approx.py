@@ -1,11 +1,8 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
-##############################
-###### Single_EMSR ###########
-##############################
 import warnings
 import numpy as np
 from operator import itemgetter
@@ -15,7 +12,14 @@ import math
 import sys
 sys.path.append('.')
 import RM_helper
+import RM_exact
 
+
+# In[3]:
+
+##############################
+###### Single_EMSR ###########
+##############################
 class Single_EMSR():
     """Solve a single resource revenue management problem (static model) using EMSR heuristic,
         with the following attributes:
@@ -116,7 +120,7 @@ class Single_EMSR():
                 val = 0
                 normal_distr = scipy.stats.norm(self.demands[j][0],self.demands[j][1])
                 dj = 0
-                while normal_distr.pdf(dj) > 1e-5:
+                while (normal_distr.pdf(dj) > 1e-5) or (dj < self.demands[j][0]):
                     prob_dj = normal_distr.pdf(dj)
                     val += prob_dj * self.calc_val(x,j,dj)
                     dj += 1
@@ -343,7 +347,6 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
 ##############################
 ###### network_DAVN ##########
 ##############################
-import RM_exact
 
 class Network_DAVN():
     """Solve a multi-resource(network) revenue management problem using DAVN method,
@@ -670,7 +673,7 @@ capacities = [60, 60]
 # print(vf)
 
 
-# In[16]:
+# In[5]:
 
 ##############################
 ###### iterative_DAVN ########
@@ -750,10 +753,10 @@ demands = [['1a', (17.3, 5.8)], ['2a', (45.1, 15.0)],['3a', (39.6, 13.2)],['4a',
 resources=['a', 'b']
 capacities = [130,130]
 
-iterative_DAVN(products, resources, demands, 1, capacities, capacities)
+# iterative_DAVN(products, resources, demands, 1, capacities, capacities)
 
 
-# In[5]:
+# In[4]:
 
 ##############################
 ###### network_DLP ###########
