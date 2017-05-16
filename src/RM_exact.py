@@ -227,7 +227,7 @@ demands = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
 # print(problem.value_func())
 
 
-# In[5]:
+# In[73]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -417,24 +417,28 @@ class Network_RM():
     
     def bid_price(self, curr_time, remain_cap):
         """Calculate the bid prices for resources at the given time, with the remaining capacities for each of them."""
-        bid_prices = [0 for _ in range(self.n_resources)]
         if curr_time <= 0:
             raise Warning("Invalid time period given.")
             return bid_prices
         
         if not self.value_functions:
             self.value_func()
-        
-        for i in range(self.n_resources):
-            bid_price_i = self.value_functions[curr_time - 1][self.state_number(remain_cap)]
-            if remain_cap[i] > 0:
-                prev_cap = remain_cap[:]
-                prev_cap[i] -= 1
-
-                bid_price_i -= self.value_functions[curr_time - 1][self.state_number(prev_cap)]
-            bid_prices[i] = bid_price_i
+        A = []
+        b = []
+        for j in range(self.n_products):
+            incidence_vector = [row[j] for row in self.incidence_matrix]
+            if incidence_vector not in A:
+                V_diff = self.value_functions[curr_time - 1][self.state_number(remain_cap)]
+                reduced_cap = [a_i - b_i for a_i, b_i in zip(remain_cap, incidence_vector)]
+                if all(c >= 0 for c in reduced_cap):
+                    V_diff -= self.value_functions[curr_time - 1][self.state_number(reduced_cap)]
+                A.append(incidence_vector)
+                b.append(V_diff)
+                if len(A) == self.n_resources:
+                    break
+        bid_prices = np.linalg.solve(A,b)
         return bid_prices
-    
+        
     def expected_revenues(self):
         if not self.value_functions:
             self.value_func()
@@ -454,14 +458,14 @@ products,demands, _ = RM_helper.sort_product_demands(ps)
 resources = ['a', 'b', 'c']
 
 T = 10
-cap = [8] * 3
+cap = [2] * 3
 problem = Network_RM(products, resources, [demands], cap, T)
 
 # T = 2
 # problem = Network_RM(products, resources, demands, [1,1], T)
-vf = problem.value_func()
-for t in range(T):
-    print(vf[t][-1])
+# vf = problem.value_func()
+# for t in range(T):
+#     print(vf[t][-1])
 # print(vf)
 # print(problem.bid_price(1, [1,1,1]))
 
