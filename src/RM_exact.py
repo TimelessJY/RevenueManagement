@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[12]:
+# In[1]:
 
 import warnings
 import numpy as np
@@ -227,7 +227,7 @@ demands = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
 # print(problem.value_func())
 
 
-# In[13]:
+# In[9]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -399,10 +399,10 @@ class Network_RM():
         for j in range(self.n_products):
             incidence_vector = [row[j] for row in self.incidence_matrix]
             if incidence_vector not in A:
-                V_diff = self.value_functions[curr_time - 1][self.state_number(remain_cap)]
+                V_diff = self.value_functions                [curr_time - 1][RM_helper.state_index(self.n_states, self.capacities, remain_cap)]
                 reduced_cap = [a_i - b_i for a_i, b_i in zip(remain_cap, incidence_vector)]
                 if all(c >= 0 for c in reduced_cap):
-                    V_diff -= self.value_functions[curr_time - 1][self.state_number(reduced_cap)]
+                    V_diff -= self.value_functions                    [curr_time - 1][RM_helper.state_index(self.n_states, self.capacities, reduced_cap)]
                 A.append(incidence_vector)
                 b.append(V_diff)
                 if len(A) == self.n_resources:
@@ -425,17 +425,18 @@ start_time = time.time()
 # resources = ['a', 'b', 'c', 'd', 'e', 'f']
 
 ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
+
 products,demands, _ = RM_helper.sort_product_demands(ps)
 resources = ['a', 'b', 'c']
 
 T = 10
-cap = [2] * 3
+cap = [8] * 3
 problem = Network_RM(products, resources, [demands], cap, T)
 
 vf = problem.value_func()
 # for t in range(T):
 #     print(vf[t][-1])
-print(vf)
+# print(vf)
 print(problem.bid_price(1, [1,1,1]))
 
 print("--- %s seconds ---" % (time.time() - start_time))

@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[6]:
+# In[1]:
 
 import numpy as np
 import scipy.stats
@@ -14,20 +14,19 @@ sys.path.append('.')
 import RM_helper
 
 
-# In[7]:
+# In[32]:
 
-##############################
-###### ADP Methods ###########
-##############################
+##############################################
+###### ADP: using one-state_transition #######
+##############################################
 
-class ADP():
+class ADP_one_state_transition():
+    """ ADP algorithm using the one-step transition matix"""
     value_functions = []
     protection_levels = []
     incidence_matrix = []
     
     def __init__(self, products, resources, demands, capacities, total_time):
-        """Return a framework for a single-resource RM problem."""
-        
         self.products = products
         self.resources = resources
         self.demands = demands
@@ -92,7 +91,7 @@ class ADP():
             print("random = ", rand, " fall into ", fall_into)
         return sample_index
     
-    def naive_method(self, n_iterations):
+    def value_func(self, n_iterations):
         prev_ests = [[0] * self.n_states for _ in range(self.total_time + 1)]
         n = 1 # iteration counter 
 
@@ -154,14 +153,164 @@ class ADP():
         return prev_ests
 
 start_time = time.time()
-# products = [ ['12', 500], ['1', 250], ['2', 250]]
-# resources = ['1', '2']
-# demands = [[0.4, 0.2, 0.3]]
+ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
+products,demands, _ = RM_helper.sort_product_demands(ps)
+demands = [demands]
+resources = ['a', 'b', 'c']
+capacities = [8] * 3
 
-# capacities=[4,4]
+problem = ADP_one_state_transition(products, resources, demands, capacities, 10)
+vf = problem.value_func(1000)
+# print(vf)
+print("--- %s seconds ---" % (time.time() - start_time))
 
 
+# In[33]:
 
+#############################################
+###### ADP: DP with feature extraction ######
+#############################################
+
+class ADP():
+    """ADP algorithm, using DP model with feature-extraction method."""
+    value_functions = []
+    protection_levels = []
+    incidence_matrix = []
+    approximations = []
+    
+    def __init__(self, products, resources, demands, capacities, total_time):
+        
+        self.products = products
+        self.resources = resources
+        self.demands = demands
+        self.capacities = capacities
+        self.total_time = total_time
+        self.n_products = len(products)
+        self.n_resources = len(resources)
+        self.n_demand_periods = len(demands)
+        
+        self.n_states = 1
+        
+        for c in self.capacities:
+            self.n_states *= (c+1)
+            
+        self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
+    
+    def DP_with_feature_extraction(self, feature_approx_method, m = -1):
+        if m < 0:
+            m = int(self.n_states / 2)
+        self.approximations = [[0] * self.n_states for _ in range(self.total_time)]
+        t = self.total_time - 1
+
+        for t in range(self.total_time -1, -1, -1):
+            while(True):
+                # choose m states, and evaluate the value in those states
+                m_states = self.choose_m_states(m)
+                m_vals = self.eval_values(m_states, t)
+
+                # extract feature vectors from these m states, and solve for the optimal coefficients
+                m_features = []
+                for s in m_states:
+                    feature_vector = self.extract_features(s, feature_approx_method)
+                    m_features.append(feature_vector)
+
+                find_coeff = self.solve_LLS_prob(m_features, m_vals)
+                if find_coeff[0]:
+                    break
+                else:
+                    # if the B matrix of the selected m states is singular, repeat the above process
+                    continue
+
+            r = find_coeff[1]
+            
+            # use the optimal coefficients computed to approximate value of other states
+            for s in range(self.n_states):
+                if s in m_states:
+                    self.approximations[t][s] = round(m_vals[m_states.index(s)],4)
+                else:
+                    feature = self.extract_features(s, feature_approx_method)
+                    approx_val = np.dot(feature, r)
+                    self.approximations[t][s] = max(round(approx_val, 4), 0)
+        
+        print("Expected revenue at beginning: ", self.approximations[0][-1])
+        return self.approximations
+        
+    def choose_m_states(self, m):
+        """helper func: choose m states from all states, currently choosing randomly"""
+        chosen_states = random.sample(range(0,self.n_states), m)
+        return chosen_states
+    
+    def eval_values(self, m_states, t):
+        """helper func: calculate the value of being at the given states, at time period t"""
+        values = []
+        demands_t = self.get_demands(t)
+        for state in m_states:
+            value = 0
+            remain_cap = RM_helper.remain_cap(self.n_states, self.capacities, state)
+            for f in range(self.n_products):
+                incidence_vector = [row[f] for row in self.incidence_matrix]
+                if all(A_f <= x for A_f,x in zip(incidence_vector,remain_cap)):
+                    if t == (self.total_time - 1): 
+                        # in the last time period, evaluate values of these m states exactly
+                        value += demands_t[f] * self.products[f][1]
+                    else:
+                        # in other time periods, consider value in the next state as approximations produced
+                        remain_cap_sell = [x - A_f for x, A_f in zip(remain_cap, incidence_vector)]
+                        next_state_sell = RM_helper.state_index(self.n_states, self.capacities, remain_cap_sell)
+                        value_sell = self.products[f][1] + self.approximations[t+1][next_state_sell]
+                        
+                        value_not_sell = self.approximations[t+1][state]
+                        
+                        value += demands_t[f] * max(value_sell, value_not_sell)
+            
+            if t < (self.total_time - 1):
+                value += (1 - sum(demands_t)) * self.approximations[t+1][state]
+            
+            values.append(value)
+        return values
+
+    def extract_features(self, state, feature_approx_method):
+        """helper func: use the given method to extract features of size (n_resource + 1) for the given states."""
+        feature = []
+        if feature_approx_method == 'separable_linear':
+            remain_cap = RM_helper.remain_cap(self.n_states, self.capacities, state)
+            feature = remain_cap[:]
+            feature.append(1)
+        else:
+            """TODO: implement separable_concave"""
+            
+        return feature
+        
+    def solve_LLS_prob(self, feature_vectors, m_vals):
+        """helper func: solve the linear least square problem, returns whether the B matrix produced by the selected
+        m staes is singular, and if not, the optimal coefficients of basis functions. """
+        m = len(m_vals)
+        B = [[0 * (self.n_resources + 1)] for _ in range(self.n_resources + 1)]
+        for feature_v in feature_vectors:
+            B += np.outer(feature_v, feature_v)
+            
+        try:
+            B_inverse = np.linalg.inv(B)
+        except np.linalg.linalg.LinAlgError as err:
+            if 'Singular matrix' in str(err):
+                return(False, [])
+            raise
+
+        C = [0] * (self.n_resources + 1)
+        for i in range(m):
+            prod = [m_vals[i] * f_v for f_v in feature_vectors[i]]
+            C = [C[r] + prod[r] for r in range(self.n_resources + 1)]
+        coeff = B_inverse.dot(C)
+        return (True, coeff)
+              
+    def get_demands(self, t):
+        """helper func: return the demands of fare products in time period t. """
+        if self.n_demand_periods > 1:
+            return self.demands[t]
+        else:
+            return self.demands[0]
+
+start_time = time.time()
 ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
 products,demands, _ = RM_helper.sort_product_demands(ps)
 demands = [demands]
@@ -169,9 +318,14 @@ resources = ['a', 'b', 'c']
 capacities = [8] * 3
 
 problem = ADP(products, resources, demands, capacities, 10)
-vf = problem.naive_method(1000)
-# print(vf)
+vf = problem.DP_with_feature_extraction("separable_linear")
+print(vf)
 print("--- %s seconds ---" % (time.time() - start_time))
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:
