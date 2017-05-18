@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[12]:
 
 import warnings
 import numpy as np
@@ -227,7 +227,7 @@ demands = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
 # print(problem.value_func())
 
 
-# In[73]:
+# In[13]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -311,35 +311,6 @@ class Network_RM():
         for c in self.capacities:
             self.n_states *= (c+1)
         
-    def state_number(self, remain_cap):
-        """helper func: converts the given array of remaining capacities into the state number"""
-        """e.g. given total capacities [1,2,1], and the remained capacities [0, 2, 1], should return 5"""
-        
-        state_num = 0
-        capacity_for_others = self.n_states
-        
-        for i in range(self.n_resources):
-            capacity_for_others /= self.capacities[i] + 1
-            state_num += remain_cap[i] * capacity_for_others
-        return int(state_num)
-        
-    def remain_cap(self, state_number):
-        """helper func: reverse of function state_number(), to convert the given state number into remained capacities"""
-        """e.g. given total capacities [1,2,3] and state_number 5, should return [0, 2, 1]"""
-        
-        if state_number >= self.n_states:
-            raise RuntimeError(
-                'Error when converting state number to remained capacities; given state number is too large.')
-        
-        remain_cap = []
-        capacity_for_others = self.n_states
-        
-        for i in range(self.n_resources):
-            capacity_for_others /= self.capacities[i] + 1
-            remain_cap.append(int(state_number // capacity_for_others))
-            state_number %= capacity_for_others
-        return remain_cap
-        
     def optimal_control(self, state_num, t):
         """
         helper func: return the optimal control, in time period t, given the state number for the remaining capacities.
@@ -347,7 +318,7 @@ class Network_RM():
         and its price exceeds the opportunity cost of the reduction in resource capacities 
         required to satisify the request
         """
-        cap_vector = self.remain_cap(state_num)
+        cap_vector = RM_helper.remain_cap(self.n_states, self.capacities,state_num)
         
         u = [0] * self.n_products
         
@@ -357,7 +328,7 @@ class Network_RM():
             if all(diff_i >= 0 for diff_i in diff):
                 delta = 0
                 if t < self.total_time - 1:
-                    delta = self.value_functions[t+1][state_num] -                     self.value_functions[t+1][self.state_number(diff)]
+                    delta = self.value_functions[t+1][state_num] -                     self.value_functions[t+1][RM_helper.state_index(self.n_states, self.capacities,diff)]
                 
                 if self.products[j][1] >= delta:
                     u[j] = 1
@@ -372,9 +343,9 @@ class Network_RM():
         value = np.dot(price_vector, control)
         Au = np.dot(self.incidence_matrix, control).tolist()
         if t < self.total_time - 1:
-            x_Au = [x_i - Au_i for x_i, Au_i in zip(self.remain_cap(state_num), Au)]
-            state_x_Au = self.state_number(x_Au)
-            value += self.value_functions[t+1][self.state_number(x_Au)]
+            x_Au = [x_i - Au_i for x_i, Au_i in zip(RM_helper.remain_cap(self.n_states, self.capacities,state_num), Au)]
+            state_x_Au = RM_helper.state_index(self.n_states, self.capacities,x_Au)
+            value += self.value_functions[t+1][RM_helper.state_index(self.n_states, self.capacities,x_Au)]
         return value
         
     def check_valid_control(self, state_num, control):
@@ -383,7 +354,7 @@ class Network_RM():
         as we only accept decisions u (i.e. control here) if Au <= x
         """
         Au = np.dot(self.incidence_matrix, control).tolist()
-        x_Au = [x_i - Au_i for x_i, Au_i in zip(self.remain_cap(state_num), Au)]
+        x_Au = [x_i - Au_i for x_i, Au_i in zip(RM_helper.remain_cap(self.n_states, self.capacities,state_num), Au)]
         return all(x_Au_i >= 0 for x_Au_i in x_Au)
     
     def value_func(self):
@@ -461,13 +432,11 @@ T = 10
 cap = [2] * 3
 problem = Network_RM(products, resources, [demands], cap, T)
 
-# T = 2
-# problem = Network_RM(products, resources, demands, [1,1], T)
-# vf = problem.value_func()
+vf = problem.value_func()
 # for t in range(T):
 #     print(vf[t][-1])
-# print(vf)
-# print(problem.bid_price(1, [1,1,1]))
+print(vf)
+print(problem.bid_price(1, [1,1,1]))
 
 print("--- %s seconds ---" % (time.time() - start_time))
 

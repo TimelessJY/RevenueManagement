@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 import warnings
 import numpy as np
@@ -15,7 +15,7 @@ import RM_helper
 import RM_exact
 
 
-# In[3]:
+# In[ ]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -342,7 +342,7 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[15]:
+# In[3]:
 
 ##############################
 ###### network_DAVN ##########
@@ -673,7 +673,7 @@ capacities = [60, 60]
 # print(vf)
 
 
-# In[5]:
+# In[4]:
 
 ##############################
 ###### iterative_DAVN ########
@@ -756,7 +756,7 @@ capacities = [130,130]
 # iterative_DAVN(products, resources, demands, 1, capacities, capacities)
 
 
-# In[4]:
+# In[7]:
 
 ##############################
 ###### network_DLP ###########

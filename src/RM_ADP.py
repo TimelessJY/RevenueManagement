@@ -1,17 +1,25 @@
 
 # coding: utf-8
 
-# In[75]:
+# In[6]:
+
+import numpy as np
+import scipy.stats
+import time
+import random
+import bisect
+
+import sys
+sys.path.append('.')
+import RM_helper
+
+
+# In[7]:
 
 ##############################
 ###### ADP Methods ###########
 ##############################
 
-import numpy as np
-import scipy.stats
-import time
-
-# def ADP_naive(products, resources, demands, capacities, max_time, num_iterations):
 class ADP():
     value_functions = []
     protection_levels = []
@@ -36,35 +44,6 @@ class ADP():
             
         self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
     
-    def state_number(self, remain_cap):
-        """helper func: converts the given array of remaining capacities into the state number"""
-        """e.g. given total capacities [1,2,1], and the remained capacities [0, 2, 1], should return 5"""
-
-        state_num = 0
-        capacity_for_others = self.n_states
-
-        for i in range(self.n_resources):
-            capacity_for_others /= self.capacities[i] + 1
-            state_num += remain_cap[i] * capacity_for_others
-        return int(state_num)
-
-    def remain_cap(self, state_number):
-        """helper func: reverse of function state_number(), to convert the given state number into remained capacities"""
-        """e.g. given total capacities [1,2,3] and state_number 5, should return [0, 2, 1]"""
-
-        if state_number >= self.n_states:
-            raise RuntimeError(
-                'Error when converting state number to remained capacities; given state number is too large.')
-
-        remain_cap = []
-        capacity_for_others = self.n_states
-
-        for i in range(self.n_resources):
-            capacity_for_others /= self.capacities[i] + 1
-            remain_cap.append(int(state_number // capacity_for_others))
-            state_number %= capacity_for_others
-        return remain_cap
-
     def eval_value(t, control, state_num, product_num):
         """helper func: evaluate the value for period t and state x, ref: equation 3.1 in the book"""
 
@@ -73,9 +52,9 @@ class ADP():
         value = np.dot(price_vector, control)
         Au = np.dot(self.incidence_matrix, control).tolist()
         if t < self.total_time - 1:
-            x_Au = [x_i - Au_i for x_i, Au_i in zip(self.remain_cap(state_num), Au)]
-            state_x_Au = self.state_number(x_Au)
-            value += self.value_functions[t+1][self.state_number(x_Au)]
+            x_Au = [x_i - Au_i for x_i, Au_i in zip(RM_helper.remain_cap(self.n_states, self.capacities,state_num), Au)]
+            state_x_Au = RM_helper.state_index(self.n_states, self.capacities,x_Au)
+            value += self.value_functions[t+1][RM_helper.state_index(self.n_states, self.capacities,x_Au)]
         return value                
 
     def cumulative_probs(self,demands):
@@ -144,7 +123,7 @@ class ADP():
                     # or sell(u_sell)
                     value_sell = 0
                     S_after_sell = S_t
-                    cap_vector = self.remain_cap(S_t)
+                    cap_vector = RM_helper.remain_cap(self.n_states, self.capacities,S_t)
                     incidence_vector = [row[request_product] for row in self.incidence_matrix]
                     diff = [x_i - a_j_i for a_j_i, x_i in zip(incidence_vector, cap_vector)]
                     if all(diff_i >= 0 for diff_i in diff):
@@ -154,7 +133,7 @@ class ADP():
                         # find the state after selling the product
                         Au = np.dot(self.incidence_matrix, u_sell).tolist()
                         x_Au = [x_i - Au_i for x_i, Au_i in zip(cap_vector, Au)] # updated remaining capacity vector
-                        S_after_sell = self.state_number(x_Au)
+                        S_after_sell = RM_helper.state_index(self.n_states, self.capacities,x_Au)
                         # estimated the value function if selling the product
                         value_sell = products[request_product][1] + prev_ests[t+1][S_after_sell]
 

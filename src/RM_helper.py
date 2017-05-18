@@ -48,6 +48,38 @@ def calc_incidence_matrix(products, resources):
     return incidence_matrix
 
 
+# In[2]:
+
+def state_index(n_states, capacities, remain_cap):
+    """converts the given array of remaining capacities into the state number"""
+    """e.g. given total capacities [1,2,1], and the remained capacities [0, 2, 1], should return 5"""
+
+    state_num = 0
+    capacity_for_others = n_states
+
+    for i in range(len(capacities)):
+        capacity_for_others /= capacities[i] + 1
+        state_num += remain_cap[i] * capacity_for_others
+    return int(state_num)
+        
+def remain_cap(n_states, capacities, state_number):
+    """reverse of function state_number(), to convert the given state number into remained capacities"""
+    """e.g. given total capacities [1,2,3] and state_number 5, should return [0, 2, 1]"""
+
+    if state_number >= n_states:
+        raise RuntimeError(
+            'Error when converting state number to remained capacities; given state number is too large.')
+
+    remain_cap = []
+    capacity_for_others = n_states
+
+    for i in range(len(capacities)):
+        capacity_for_others /= capacities[i] + 1
+        remain_cap.append(int(state_number // capacity_for_others))
+        state_number %= capacity_for_others
+    return remain_cap
+
+
 # In[ ]:
 
 
