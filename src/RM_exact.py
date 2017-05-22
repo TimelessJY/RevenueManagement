@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[35]:
 
 import warnings
 import numpy as np
@@ -67,8 +67,6 @@ class Single_RM_static():
             if products[j][1] < products[j+1][1]:
                 raise ValueError('The products are not in the descending order of their revenues.')
         
-    
-    
     def value_func(self):
         """Calculate the value functions of this problem and the protection levels for the products."""
         
@@ -106,7 +104,11 @@ class Single_RM_static():
 #               ", with protection levels=", self.protection_levels)
             bid_prices = [v[-1] - v[-2] for v in self.value_functions]
         return (self.value_functions, self.protection_levels, bid_prices)
-
+    
+    def bid_prices(self):
+        if not self.value_functions:
+            self.value_func()
+        return RM_helper.single_bid_prices(self.value_functions, self.products, self.capacity)
 
 
 start_time = time.time()
@@ -227,7 +229,7 @@ demands = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
 # print(problem.value_func())
 
 
-# In[9]:
+# In[36]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -318,45 +320,37 @@ class Network_RM():
         and its price exceeds the opportunity cost of the reduction in resource capacities 
         required to satisify the request
         """
-        cap_vector = RM_helper.remain_cap(self.n_states, self.capacities,state_num)
+        cap_vector = RM_helper.remain_cap(self.n_states, self.capacities, state_num)
         
         u = [0] * self.n_products
         
         for j in range(self.n_products):
             incidence_vector = [row[j] for row in self.incidence_matrix]
-            diff = [x_i - a_j_i for a_j_i, x_i in zip(incidence_vector, cap_vector)]
-            if all(diff_i >= 0 for diff_i in diff):
+            reduced_cap = [x_i - a_j_i for x_i, a_j_i in zip(cap_vector, incidence_vector)]
+            if all(c >= 0 for c in reduced_cap):
                 delta = 0
                 if t < self.total_time - 1:
-                    delta = self.value_functions[t+1][state_num] -                     self.value_functions[t+1][RM_helper.state_index(self.n_states, self.capacities,diff)]
+                    reduced_state = RM_helper.state_index(self.n_states, self.capacities, reduced_cap)
+                    delta = self.value_functions[t+1][state_num] - self.value_functions[t+1][reduced_state]
                 
                 if self.products[j][1] >= delta:
                     u[j] = 1
-#         print("optimal control for product ", self.products[j][0], " is ", u, " at period ", t, " for x=", cap_vector)
         return u
                 
-    def eval_value(self, t, control, state_num, product_num):
+    def eval_value(self, t, state_num, product_num, control_product):
         """helper func: evaluate the value for period t and state x, ref: equation 3.1 in the book"""
         
-        price_vector = [0] * self.n_products
-        price_vector[product_num] = self.products[product_num][1]
-        value = np.dot(price_vector, control)
-        Au = np.dot(self.incidence_matrix, control).tolist()
-        if t < self.total_time - 1:
-            x_Au = [x_i - Au_i for x_i, Au_i in zip(RM_helper.remain_cap(self.n_states, self.capacities,state_num), Au)]
-            state_x_Au = RM_helper.state_index(self.n_states, self.capacities,x_Au)
-            value += self.value_functions[t+1][RM_helper.state_index(self.n_states, self.capacities,x_Au)]
-        return value
+        value = self.products[product_num][1] * control_product
+        incidence_vector = [row[product_num] for row in self.incidence_matrix]
+        Au = [x * control_product for x in incidence_vector]
         
-    def check_valid_control(self, state_num, control):
-        """
-        helper func: check if the given control is valid within the given state, 
-        as we only accept decisions u (i.e. control here) if Au <= x
-        """
-        Au = np.dot(self.incidence_matrix, control).tolist()
-        x_Au = [x_i - Au_i for x_i, Au_i in zip(RM_helper.remain_cap(self.n_states, self.capacities,state_num), Au)]
-        return all(x_Au_i >= 0 for x_Au_i in x_Au)
-    
+        if t < self.total_time - 1:
+            curr_x = RM_helper.remain_cap(self.n_states, self.capacities, state_num)
+            x_Au = [x_i - Au_i for x_i, Au_i in zip(curr_x, Au)]
+            state_x_Au = RM_helper.state_index(self.n_states, self.capacities,x_Au)
+            value += self.value_functions[t+1][state_x_Au]
+        return value
+   
     def value_func(self):
         """Return the value functions of this problem, calculate it if necessary. """
         self.value_functions = [[0] * self.n_states for _ in range(self.total_time)] 
@@ -372,49 +366,31 @@ class Network_RM():
                     demand = demands[j]
                     j_value = 0
                     if demand > 0:
-                        u = [0] * self.n_products
-                        u[j] = opt_control[j]
-                        j_value = self.eval_value(t, u, x, j)
+                        u_j = opt_control[j]
+                        j_value = self.eval_value(t, x, j, u_j)
                         
                         value += j_value * demand
+                
                 demand = 1- sum(demands)
-                no_request_val = 0
                 if t < (self.total_time-1):
                     no_request_val = self.value_functions[t+1][x]
-                value += no_request_val * demand
+                    value += no_request_val * demand
                 self.value_functions[t][x] = round(value, 3)
-        print("Expected Revenue At Beginning is ", self.value_functions[0][-1])
+                
         return self.value_functions
     
-    def bid_price(self, curr_time, remain_cap):
-        """Calculate the bid prices for resources at the given time, with the remaining capacities for each of them."""
-        if curr_time <= 0:
-            raise Warning("Invalid time period given.")
-            return bid_prices
-        
+    def bid_prices(self):
+        """return the bid prices for resources over all time periods and all remaining capacities situations."""
         if not self.value_functions:
             self.value_func()
-        A = []
-        b = []
-        for j in range(self.n_products):
-            incidence_vector = [row[j] for row in self.incidence_matrix]
-            if incidence_vector not in A:
-                V_diff = self.value_functions                [curr_time - 1][RM_helper.state_index(self.n_states, self.capacities, remain_cap)]
-                reduced_cap = [a_i - b_i for a_i, b_i in zip(remain_cap, incidence_vector)]
-                if all(c >= 0 for c in reduced_cap):
-                    V_diff -= self.value_functions                    [curr_time - 1][RM_helper.state_index(self.n_states, self.capacities, reduced_cap)]
-                A.append(incidence_vector)
-                b.append(V_diff)
-                if len(A) == self.n_resources:
-                    break
-        bid_prices = np.linalg.solve(A,b)
-        return bid_prices
+        return RM_helper.network_bid_prices(self.value_functions, self.products, self.resources, self.capacities,                                             self.incidence_matrix, self.n_states)
         
-    def expected_revenues(self):
+    def total_expected_revenue(self):
+        """returns the expected revenues """
         if not self.value_functions:
             self.value_func()
         
-        return [x[-1] for x in self.value_func]
+        return self.value_functions[0][-1]
 
 start_time = time.time()
 
@@ -424,22 +400,27 @@ start_time = time.time()
 # products,demands, _ = RM_helper.sort_product_demands(ps)
 # resources = ['a', 'b', 'c', 'd', 'e', 'f']
 
-ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
+# ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601], \
+#       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
+
+ps = [['a1', 0.22, 200], ['a2', 0.06, 503], ['ab1', 0.18, 400],['ab2', 0.1, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.13, 920],['c1', 0.07, 832]]
+resources = ['a', 'b', 'c']
+cap = [16] * 3
+T = 6
 
 products,demands, _ = RM_helper.sort_product_demands(ps)
-resources = ['a', 'b', 'c']
+# resources = ['a', 'b', 'c']
 
-T = 10
-cap = [8] * 3
+# T = 10
+# cap = [4] * 3
 problem = Network_RM(products, resources, [demands], cap, T)
 
 vf = problem.value_func()
-# for t in range(T):
-#     print(vf[t][-1])
 # print(vf)
-print(problem.bid_price(1, [1,1,1]))
+# print(problem.total_expected_revenue())
+print(problem.bid_prices())
 
-print("--- %s seconds ---" % (time.time() - start_time))
+# print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # In[ ]:

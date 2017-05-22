@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[7]:
 
 import numpy as np
 import scipy.stats
@@ -14,17 +14,17 @@ sys.path.append('.')
 import RM_helper
 
 
-# In[32]:
+# In[3]:
 
 ##############################################
 ###### ADP: using one-state_transition #######
 ##############################################
 
-class ADP_one_state_transition():
+class One_state_transition():
     """ ADP algorithm using the one-step transition matix"""
     value_functions = []
-    protection_levels = []
     incidence_matrix = []
+    default_iterations = 100
     
     def __init__(self, products, resources, demands, capacities, total_time):
         self.products = products
@@ -148,35 +148,48 @@ class ADP_one_state_transition():
                 prev_ests = current_estimation
 
             n += 1
-#             print(prev_ests)
-        print("Expected revenue at beginning: ", prev_ests[0][-1])
-        return prev_ests
+        self.value_functions = prev_ests
+        return self.value_functions
+    
+    def bid_prices(self):
+        """return the bid prices for resources over all time periods and all remaining capacities situations."""
+        if not self.value_functions:
+            self.value_func(self.default_iterations)
 
-start_time = time.time()
+        return RM_helper.network_bid_prices(self.value_functions, self.products, self.resources, self.capacities,                                             self.incidence_matrix, self.n_states)
+
+    def total_expected_revenue(self):
+        if not self.value_functions:
+            self.value_func(self.default_iterations)
+            
+        return self.approximations[0][-1]
+
+
 ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
 products,demands, _ = RM_helper.sort_product_demands(ps)
 demands = [demands]
 resources = ['a', 'b', 'c']
 capacities = [8] * 3
 
-problem = ADP_one_state_transition(products, resources, demands, capacities, 10)
+start_time = time.time()
+problem = One_state_transition(products, resources, demands, capacities, 10)
 vf = problem.value_func(1000)
+# print(problem.bid_prices()
 # print(vf)
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[33]:
+# In[13]:
 
 #############################################
 ###### ADP: DP with feature extraction ######
 #############################################
 
-class ADP():
+class DP_w_featureExtraction():
     """ADP algorithm, using DP model with feature-extraction method."""
-    value_functions = []
-    protection_levels = []
     incidence_matrix = []
     approximations = []
+    default_method = "separable_affine"
     
     def __init__(self, products, resources, demands, capacities, total_time):
         
@@ -196,9 +209,17 @@ class ADP():
             
         self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
     
-    def DP_with_feature_extraction(self, feature_approx_method, m = -1):
-        if m < 0:
+    def value_func(self, feature_approx_method = "", m = 0):
+        """Calculate the value functions, 
+        using the given feature approximation method(default as separable affine, ref: An ADP approach to Network RM),
+        with m states chosen in each time period to get observations. """
+        
+        if not feature_approx_method:
+            feature_approx_method = self.default_method
+            
+        if m <= 0:
             m = int(self.n_states / 2)
+            
         self.approximations = [[0] * self.n_states for _ in range(self.total_time)]
         t = self.total_time - 1
 
@@ -232,7 +253,6 @@ class ADP():
                     approx_val = np.dot(feature, r)
                     self.approximations[t][s] = max(round(approx_val, 4), 0)
         
-        print("Expected revenue at beginning: ", self.approximations[0][-1])
         return self.approximations
         
     def choose_m_states(self, m):
@@ -272,7 +292,7 @@ class ADP():
     def extract_features(self, state, feature_approx_method):
         """helper func: use the given method to extract features of size (n_resource + 1) for the given states."""
         feature = []
-        if feature_approx_method == 'separable_linear':
+        if feature_approx_method == self.default_method:
             remain_cap = RM_helper.remain_cap(self.n_states, self.capacities, state)
             feature = remain_cap[:]
             feature.append(1)
@@ -309,18 +329,41 @@ class ADP():
             return self.demands[t]
         else:
             return self.demands[0]
+        
+    def bid_prices(self):
+        """return the bid prices for resources over all time periods and all remaining capacities situations."""
+        if not self.approximations:
+            self.value_func(self.default_method)
+            
+        return RM_helper.network_bid_prices(self.approximations, self.products, self.resources, self.capacities,                                             self.incidence_matrix, self.n_states)
+    
+    def total_expected_revenue(self):
+        if not self.approximations:
+            self.value_func(self.default_method)
+            
+        return self.approximations[0][-1]
+    
 
-start_time = time.time()
-ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
+# ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601], \
+#       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
+# products,demands, _ = RM_helper.sort_product_demands(ps)
+# demands = [demands]
+# resources = ['a', 'b', 'c']
+# capacities = [8] * 3
+
+ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['ab3', 0.05, 601],       ['ab4', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
 products,demands, _ = RM_helper.sort_product_demands(ps)
 demands = [demands]
 resources = ['a', 'b', 'c']
-capacities = [8] * 3
+capacities = [5] * 3
 
-problem = ADP(products, resources, demands, capacities, 10)
-vf = problem.DP_with_feature_extraction("separable_linear")
-print(vf)
-print("--- %s seconds ---" % (time.time() - start_time))
+start_time = time.time()
+problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
+# vf = problem.value_func()
+# print(vf)
+# print(problem.bid_prices())
+# print(problem.total_expected_revenue())
+# print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # In[ ]:

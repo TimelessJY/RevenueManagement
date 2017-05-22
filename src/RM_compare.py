@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[13]:
+# In[2]:
 
 import pandas
 import time
@@ -10,13 +10,14 @@ sys.path.append('.')
 import RM_exact
 import RM_approx
 import RM_helper
+import RM_ADP
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.legend_handler import HandlerLine2D
 
 
-# In[1]:
+# In[ ]:
 
 def compare_single_static(products, demands, cap_lb, cap_ub, cap_interval):
     """Compare the exact DP model with a heuristic, EMSR-b, for static models of single-resource RM problems."""
@@ -78,7 +79,7 @@ plt.plot(x, y_diff, 'ro-')
 plt.savefig('Single-Diff')
 
 
-# In[11]:
+# In[ ]:
 
 plt.clf()
 DP_time = [r[2] for r in result]
@@ -92,7 +93,7 @@ plt.xlabel('Resource Capacity')
 plt.savefig('Single-times')
 
 
-# In[4]:
+# In[ ]:
 
 def compare_iDAVN_singleDPstatic(products, resources, n_class, cap_lb, cap_ub, cap_interval):
     """Compare the iterative DAVN method, with a collection of single-resource static DP model."""
@@ -186,7 +187,7 @@ plt.xlabel('Resource Capacity')
 plt.savefig('DAVN-ssDP-diff')
 
 
-# In[12]:
+# In[ ]:
 
 # Draw the graph of running time of the network_DP model
 def eval_networkDP_changingCap(products, resources, cap_lb, cap_ub, total_time):
@@ -263,7 +264,120 @@ plt.xlabel('Resource Capacity')
 plt.savefig('network-DP-time-6')
 
 
-# In[ ]:
+# In[15]:
+
+def evaluate_network_control(products, resources, demands, capacities, approxed_bid_prices, total_time, iterations):
+    incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
+    
+    diff_percents = []
+    for round in range(iterations):
+        requests = RM_helper.sample_demands(demands, total_time)
+
+        rev_exact = 0 # records the total revenue using the optimal control
+        curr_cap_exact = capacities[:]
+        rev_heuri = 0 # records the total revenue using the control produced by heuristic/approximation
+        curr_cap_heuri = capacities[:]
+
+        total_states = 1
+        for c in capacities:
+                total_states *= (c+1)
+
+        exact_method = RM_exact.Network_RM(products, resources, [demands], capacities, total_time)
+        exact_method.value_func()
+        exact_bid_prices = exact_method.bid_prices()
+
+        for t in range(total_time):
+            prod_requested = requests[t]
+            if prod_requested < len(products):
+                # a request arrives
+                incidence_vector = [row[prod_requested] for row in incidence_matrix]
+                state_index_exact = RM_helper.state_index(total_states, capacities, curr_cap_exact)
+                state_index_heuri = RM_helper.state_index(total_states, capacities, curr_cap_heuri)
+                
+                rev = products[prod_requested][1]
+                if decide_to_sell(incidence_vector, curr_cap_exact, exact_bid_prices, rev, t, state_index_exact):
+                    curr_cap_exact = [c_i - x_i for c_i, x_i in zip(curr_cap_exact, incidence_vector)]
+                    rev_exact += rev
+                if decide_to_sell(incidence_vector, curr_cap_heuri, approxed_bid_prices, rev, t, state_index_heuri):
+                    curr_cap_heuri = [c_i - x_i for c_i, x_i in zip(curr_cap_heuri, incidence_vector)]
+                    rev_heuri += rev
+#         print("exact rev=", rev_exact, ", heuristic rev=", rev_heuri)
+        if rev_exact >= rev_heuri:
+            diff = rev_exact - rev_heuri
+            diff_percent = (diff / rev_exact) * 100
+            diff_percents.append(diff_percent)
+        else:
+            print("exact=", rev_exact, "heur=", rev_heuri)
+    
+    avrg_diff_percent = np.mean(diff_percents)
+    return avrg_diff_percent
+            
+def decide_to_sell(incidence_vector, remained_cap, resource_bid_prices, profit, t, s):
+    """deicide at time t, state s, whether to sell the product according to its profit"""
+    if t < len(resource_bid_prices) - 1:
+        bid_prices = resource_bid_prices[t+1][s]
+        opportunity_cost = np.dot(incidence_vector, bid_prices)
+    else:
+        opportunity_cost = 0
+    return all(x_i <= c_i for x_i, c_i in zip(incidence_vector, remained_cap)) and profit >= opportunity_cost
 
 
+# In[21]:
+
+def eval_ADP_DPf(pros, resources, capacities, total_time, iterations):
+    """Compare the ADP algorithm using DP model with feature extraction, with exact DP model of network problems."""
+    products, demands,_ = RM_helper.sort_product_demands(pros)
+    problem = RM_ADP.DP_w_featureExtraction(products, resources, [demands], capacities, total_time)
+    problem.value_func("")
+    bid_prices = problem.bid_prices()
+    diff_percent = evaluate_network_control(products, resources, demands, capacities, bid_prices, total_time,                                             iterations)
+    return diff_percent
+
+
+def visualize_perf_ADP_DPf(products, resources, T_lb, T_ub, T_interval, cap_lb, cap_ub, cap_interval, iterations):
+    """Visualize the performance of ADP_DPf method, against network_DP model."""
+    n_resources = len(resources)
+    Ts = [T for T in range(T_lb, T_ub + 1, T_interval)]
+    col_titles = [('diff-T='+str(T)) for T in Ts]
+    col_titles.append('mean_diff')
+    
+    capacities = [c for c in range(cap_lb, cap_ub + 1, cap_interval)]
+    table_data = []
+    
+    for cap in capacities:
+        caps = [cap] * n_resources
+        result= []
+        for T in Ts:
+            result.append(eval_ADP_DPf(products, resources, caps, T, iterations))
+        
+        result.append(np.mean(result))
+        table_data.append(result)
+    
+    print(pandas.DataFrame(table_data, capacities, col_titles))
+    return table_data
+
+ps = [['a1', 0.22, 200], ['a2', 0.06, 503], ['ab1', 0.18, 400],['ab2', 0.1, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.13, 920],['c1', 0.07, 832]]
+resources = ['a', 'b', 'c']
+
+T_lb = 10
+T_ub = 20
+T_interval = 10
+cap_lb = 2
+cap_ub = 20
+cap_interval = 8 
+iterations = 20
+data = visualize_perf_ADP_DPf(ps, resources, T_lb, T_ub, T_interval, cap_lb, cap_ub, cap_interval, iterations)
+
+plt.clf()
+x= np.linspace(cap_lb, cap_ub, (cap_ub - cap_lb) / cap_interval + 1)
+for i in range(1):
+    T = T_lb + T_interval * i
+    rev_diff = [d[i] for d in data]
+    plt.plot(x, rev_diff, linestyle='dashed', marker='s', label="T="+str(T))
+    
+plt.legend()
+plt.ylabel('Difference in Expected Revenue(%)')
+plt.xlabel('Resource Capacity')
+plt.show()
+plt.savefig('ADP_DPf_networkDP-rev-diff')
 
