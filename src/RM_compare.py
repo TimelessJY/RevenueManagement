@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 import pandas
 import time
@@ -264,14 +264,21 @@ plt.xlabel('Resource Capacity')
 plt.savefig('network-DP-time-6')
 
 
-# In[15]:
+# In[9]:
 
 def evaluate_network_control(products, resources, demands, capacities, approxed_bid_prices, total_time, iterations):
+    """using the given bid-prices of a heuristic/approximation to evaluate the difference between revenues gained 
+    between that heuristic/approximation with optimal method, i.e. network-DP model"""
     incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
     
     diff_percents = []
+    
+    exact_method = RM_exact.Network_RM(products, resources, [demands], capacities, total_time)
+    exact_method.value_func()
+    exact_bid_prices = exact_method.bid_prices()
+    
     for round in range(iterations):
-        requests = RM_helper.sample_demands(demands, total_time)
+        requests = RM_helper.sample_network_demands(demands, total_time)
 
         rev_exact = 0 # records the total revenue using the optimal control
         curr_cap_exact = capacities[:]
@@ -281,10 +288,6 @@ def evaluate_network_control(products, resources, demands, capacities, approxed_
         total_states = 1
         for c in capacities:
                 total_states *= (c+1)
-
-        exact_method = RM_exact.Network_RM(products, resources, [demands], capacities, total_time)
-        exact_method.value_func()
-        exact_bid_prices = exact_method.bid_prices()
 
         for t in range(total_time):
             prod_requested = requests[t]
@@ -306,8 +309,6 @@ def evaluate_network_control(products, resources, demands, capacities, approxed_
             diff = rev_exact - rev_heuri
             diff_percent = (diff / rev_exact) * 100
             diff_percents.append(diff_percent)
-        else:
-            print("exact=", rev_exact, "heur=", rev_heuri)
     
     avrg_diff_percent = np.mean(diff_percents)
     return avrg_diff_percent
@@ -322,7 +323,7 @@ def decide_to_sell(incidence_vector, remained_cap, resource_bid_prices, profit, 
     return all(x_i <= c_i for x_i, c_i in zip(incidence_vector, remained_cap)) and profit >= opportunity_cost
 
 
-# In[21]:
+# In[10]:
 
 def eval_ADP_DPf(pros, resources, capacities, total_time, iterations):
     """Compare the ADP algorithm using DP model with feature extraction, with exact DP model of network problems."""
@@ -332,7 +333,6 @@ def eval_ADP_DPf(pros, resources, capacities, total_time, iterations):
     bid_prices = problem.bid_prices()
     diff_percent = evaluate_network_control(products, resources, demands, capacities, bid_prices, total_time,                                             iterations)
     return diff_percent
-
 
 def visualize_perf_ADP_DPf(products, resources, T_lb, T_ub, T_interval, cap_lb, cap_ub, cap_interval, iterations):
     """Visualize the performance of ADP_DPf method, against network_DP model."""
@@ -380,4 +380,117 @@ plt.ylabel('Difference in Expected Revenue(%)')
 plt.xlabel('Resource Capacity')
 plt.show()
 plt.savefig('ADP_DPf_networkDP-rev-diff')
+
+
+# In[15]:
+
+def evaluate_single_static_control(products, demands, capacity, heuri_bid_prices, iterations):
+    """using the given bid-prices of a heuristic/approximation to evaluate the difference between revenues gained 
+    between that heuristic/approximation with optimal method, i.e. network-DP model"""
+    diff_percents = []
+    n_products = len(products)
+    
+    exact_method = RM_exact.Single_RM_static(products, demands, capacity)
+    exact_method.value_func()
+    exact_bid_prices = exact_method.bid_prices()
+    
+    for round in range(iterations):
+        requests = RM_helper.sample_single_static_demands(demands)
+
+        rev_exact = 0 # records the total revenue using the optimal control
+        curr_cap_exact = capacity
+        rev_heuri = 0 # records the total revenue using the control produced by heuristic/approximation
+        curr_cap_heuri = capacity
+
+        # stage 1, accept all requests if satisfiable by current capacity, as this will be the highest-revenue product
+        request = requests[0]
+        sell_amount = min(request, capacity)
+        profit = sell_amount * products[0][1]
+        rev_exact += profit
+        curr_cap_exact -= sell_amount
+        rev_heuri += profit
+        curr_cap_heuri -= sell_amount
+        
+        for j in range(1, n_products):
+            request = requests[j]
+            price_j = products[j][1]
+            
+            bp_exact = exact_bid_prices[j - 1]
+            sell_amount_exact = how_many_to_sell(price_j, bp_exact, curr_cap_exact, request)
+            rev_exact += price_j * sell_amount_exact
+            curr_cap_exact -= sell_amount_exact
+            
+            bp_heuri = heuri_bid_prices[j - 1]
+            sell_amount_heuri = how_many_to_sell(price_j, bp_heuri, curr_cap_heuri, request)
+            rev_heuri += price_j * sell_amount_heuri
+            curr_cap_heuri -= sell_amount_heuri
+#         print("exact rev=", rev_exact, ", heuristic rev=", rev_heuri)
+
+        if rev_exact >= rev_heuri:
+            diff = rev_exact - rev_heuri
+            diff_percent = (diff / rev_exact) * 100
+            diff_percents.append(diff_percent)
+    
+    avrg_diff_percent = np.mean(diff_percents)
+    return avrg_diff_percent
+            
+def how_many_to_sell(price, bid_prices, remain_cap, demand):
+    """deicide the amount of products to sell based on the current stage's bid price and the remaining capacity. """
+    if price < bid_prices[remain_cap]:
+        return 0
+    else:
+        for z in range(min(demand, remain_cap), 0, -1):
+            if price >= bid_prices[remain_cap - z]:
+                return z
+        return 0
+
+
+# In[18]:
+
+def evaluate_EMSR_b(pros, cap, iterations):
+    """Compare the EMSR-b method, with single-static DP model."""
+    products, demands,_ = RM_helper.sort_product_demands(pros)
+    problem = RM_approx.Single_EMSR(products, demands, cap)
+    problem.value_func()
+    bid_prices = problem.bid_prices()
+    diff_percent = evaluate_single_static_control(products, demands, cap, bid_prices, iterations)
+    return diff_percent
+
+def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
+    """Visualize the performance of EMSR-b method, against single-static DP model."""
+    capacities = [c for c in range(cap_lb, cap_ub + 1, cap_interval)]
+    col_titles = ["mean-diff %"]
+    
+    table_data = []
+    
+    for cap in capacities:
+        result= [evaluate_EMSR_b(products, cap, iterations)]
+        
+        table_data.append(result)
+    
+    print(pandas.DataFrame(table_data, capacities, col_titles))
+    return table_data
+
+pros = [[1,(17.3, 5.8), 1050], [2, (45.1, 15.0), 567], [3, (39.6, 13.2), 534], [4,(34.0, 11.3),520],        [5, (28, 4.3), 498], [6, (12.2, 3.9), 359]]
+# evaluate_EMSR_b(pros, 80, 20)
+cap_lb = 80
+cap_ub = 150
+cap_interval = 10
+iteration = 20
+data = visualize_perf_EMSR_b(pros, cap_lb, cap_ub,cap_interval,iteration)
+y = [d[0] for d in data]
+
+plt.clf()
+x= np.linspace(cap_lb, cap_ub, (cap_ub - cap_lb) / cap_interval + 1)
+plt.plot(x, y, linestyle='dashed', marker='s')
+    
+plt.ylabel('Difference in Expected Revenue(%)')
+plt.xlabel('Resource Capacity')
+# plt.show()
+plt.savefig('single_static_revs_diff')
+
+
+# In[ ]:
+
+
 

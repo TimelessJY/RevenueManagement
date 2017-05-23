@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[4]:
 
 import warnings
 import numpy as np
@@ -15,7 +15,7 @@ import RM_helper
 import RM_exact
 
 
-# In[ ]:
+# In[3]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -131,6 +131,10 @@ class Single_EMSR():
 #               ", with protection levels=", self.protection_levels) 
         return (self.value_functions, self.protection_levels)
                 
+    def bid_prices(self):
+        if not self.value_functions:
+            self.value_func()
+        return RM_helper.single_bid_prices(self.value_functions, self.products, self.capacity)
     
 start_time = time.time()
 products = [[1, 1050], [2,567], [3, 534], [4,520]]
@@ -139,6 +143,7 @@ demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 # problem = Single_EMSR(products, demands, 80)
 # result = problem.value_func()
 # print(result)
+# print(problem.bid_prices())
 
 print("--- %s seconds ---" % (time.time() - start_time))
 

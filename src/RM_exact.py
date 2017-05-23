@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[35]:
+# In[1]:
 
 import warnings
 import numpy as np
@@ -102,8 +102,7 @@ class Single_RM_static():
                         break
 #         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity], \
 #               ", with protection levels=", self.protection_levels)
-            bid_prices = [v[-1] - v[-2] for v in self.value_functions]
-        return (self.value_functions, self.protection_levels, bid_prices)
+        return (self.value_functions, self.protection_levels)
     
     def bid_prices(self):
         if not self.value_functions:
@@ -120,6 +119,8 @@ cap = 80
 problem = Single_RM_static(products, demands, cap)
 # vf = problem.value_func()
 # print(vf)
+# bp = problem.bid_prices()
+# print(bp)
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
@@ -229,7 +230,7 @@ demands = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
 # print(problem.value_func())
 
 
-# In[36]:
+# In[4]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -400,25 +401,18 @@ start_time = time.time()
 # products,demands, _ = RM_helper.sort_product_demands(ps)
 # resources = ['a', 'b', 'c', 'd', 'e', 'f']
 
-# ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601], \
-#       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
-
 ps = [['a1', 0.22, 200], ['a2', 0.06, 503], ['ab1', 0.18, 400],['ab2', 0.1, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.13, 920],['c1', 0.07, 832]]
 resources = ['a', 'b', 'c']
 cap = [16] * 3
 T = 6
 
 products,demands, _ = RM_helper.sort_product_demands(ps)
-# resources = ['a', 'b', 'c']
-
-# T = 10
-# cap = [4] * 3
 problem = Network_RM(products, resources, [demands], cap, T)
 
-vf = problem.value_func()
+# vf = problem.value_func()
 # print(vf)
 # print(problem.total_expected_revenue())
-print(problem.bid_prices())
+# print(problem.bid_prices())
 
 # print("--- %s seconds ---" % (time.time() - start_time))
 

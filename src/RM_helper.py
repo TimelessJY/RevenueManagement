@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[3]:
+# In[67]:
 
 import numpy as np
 import time
@@ -63,7 +63,7 @@ def state_index(n_states, capacities, remain_cap):
     """e.g. given total capacities [1,2,1], and the remained capacities [0, 2, 1], should return 5"""
 
     if n_states == 0:
-        n_states = 
+        n_states = 1
         for c in capacities:
             n_states *= (c + 1)
     
@@ -93,9 +93,9 @@ def remain_cap(n_states, capacities, state_number):
     return remain_cap
 
 
-# In[66]:
+# In[81]:
 
-def sample_demands(demands, total_time):
+def sample_network_demands(demands, total_time):
     """samples a series of index of products, whose request arrives at each period in the given total time """
     cumu_prob = [0] * len(demands)
     up_to = 0
@@ -112,8 +112,17 @@ def sample_demands(demands, total_time):
         sample_index[t] = fall_into
     return sample_index
 
+def sample_single_static_demands(demands):
+    """samples a series of demands, based on the distributions of demand of each products. """
+    sampled_demands = []
+    for i in range(len(demands)):
+        sample = np.random.normal(demands[i][0], demands[i][1])
+        sampled_demands.append(int(sample))
+        
+    return sampled_demands
 
-# In[65]:
+
+# In[68]:
 
 def network_bid_prices(value_func, products, resources, capacities, incidence_matrix, n_states):
     """Calculate the bid prices for resources at every state in every time period."""
@@ -159,4 +168,25 @@ def network_bid_prices(value_func, products, resources, capacities, incidence_ma
             bid_price_t.append([round(bp_r, 3) for bp_r in bp_t_s])
         bid_prices.append(bid_price_t)
     return bid_prices
+
+
+# In[82]:
+
+def single_bid_prices(value_func, products, capacity):
+    """Calculate the bid price in single-static RM problems, for each product, at each capacity level."""
+    bid_prices = []
+# self.value_functions = [[0] * (self.capacity + 1) for _ in range(self.n_products)]
+    for j in range(len(value_func) - 1):
+        bid_price_j = [0]
+        for x in range(1, capacity + 1):
+            bid_price = value_func[j][x] - value_func[j][x-1]
+            bid_price_j.append(round(bid_price, 3))
+            
+        bid_prices.append(bid_price_j)
+    return bid_prices
+
+
+# In[ ]:
+
+
 
