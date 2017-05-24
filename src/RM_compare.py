@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[18]:
 
 import pandas
 import time
@@ -382,112 +382,121 @@ plt.show()
 plt.savefig('ADP_DPf_networkDP-rev-diff')
 
 
-# In[15]:
+# In[22]:
 
-def evaluate_single_static_control(products, demands, capacity, heuri_bid_prices, iterations):
-    """using the given bid-prices of a heuristic/approximation to evaluate the difference between revenues gained 
-    between that heuristic/approximation with optimal method, i.e. network-DP model"""
-    diff_percents = []
+def eval_single_static_by_bid_prices(products, requests, bid_prices, capacity):
+    """ Use sampled requests of products, to calculate the expected revenue using the given bid-prices. """
+    """ note that input of requests are in descending order of products' prices. """
     n_products = len(products)
+    total_rev = 0
+    remain_cap = capacity
+    for fare_class in range(n_products - 1, 0, -1):
+        price = products[fare_class][1]
+        bid_price = bid_prices[fare_class - 1]
+        if price >= bid_price[remain_cap]:
+            # only sell product of current fare class if its profit exceeds the bid price of current class
+            for z in range(min(requests[fare_class], remain_cap), -1, -1):
+                if price >= bid_price[remain_cap - z]:
+#                     print("in bidPrice: reque = ", requests[fare_class], ", price=", price, " bid_price=", bid_price[remain_cap - z], " decision=",z)
+                    remain_cap -= z
+                    total_rev += price * z
+                    break
+    # for the highest fare class, accept all requests
+    request = requests[0]
+    z = min(request, remain_cap)
+    remain_cap -= z
+    total_rev += products[0][1] * z
     
-    exact_method = RM_exact.Single_RM_static(products, demands, capacity)
-    exact_method.value_func()
-    exact_bid_prices = exact_method.bid_prices()
-    
-    for round in range(iterations):
-        requests = RM_helper.sample_single_static_demands(demands)
+    return (total_rev, remain_cap)
 
-        rev_exact = 0 # records the total revenue using the optimal control
-        curr_cap_exact = capacity
-        rev_heuri = 0 # records the total revenue using the control produced by heuristic/approximation
-        curr_cap_heuri = capacity
-
-        # stage 1, accept all requests if satisfiable by current capacity, as this will be the highest-revenue product
-        request = requests[0]
-        sell_amount = min(request, capacity)
-        profit = sell_amount * products[0][1]
-        rev_exact += profit
-        curr_cap_exact -= sell_amount
-        rev_heuri += profit
-        curr_cap_heuri -= sell_amount
-        
-        for j in range(1, n_products):
-            request = requests[j]
-            price_j = products[j][1]
-            
-            bp_exact = exact_bid_prices[j - 1]
-            sell_amount_exact = how_many_to_sell(price_j, bp_exact, curr_cap_exact, request)
-            rev_exact += price_j * sell_amount_exact
-            curr_cap_exact -= sell_amount_exact
-            
-            bp_heuri = heuri_bid_prices[j - 1]
-            sell_amount_heuri = how_many_to_sell(price_j, bp_heuri, curr_cap_heuri, request)
-            rev_heuri += price_j * sell_amount_heuri
-            curr_cap_heuri -= sell_amount_heuri
-#         print("exact rev=", rev_exact, ", heuristic rev=", rev_heuri)
-
-        if rev_exact >= rev_heuri:
-            diff = rev_exact - rev_heuri
-            diff_percent = (diff / rev_exact) * 100
-            diff_percents.append(diff_percent)
-    
-    avrg_diff_percent = np.mean(diff_percents)
-    return avrg_diff_percent
-            
-def how_many_to_sell(price, bid_prices, remain_cap, demand):
-    """deicide the amount of products to sell based on the current stage's bid price and the remaining capacity. """
-    if price < bid_prices[remain_cap]:
-        return 0
-    else:
-        for z in range(min(demand, remain_cap), 0, -1):
-            if price >= bid_prices[remain_cap - z]:
-                return z
-        return 0
+def eval_single_static_by_protection_levels(products, requests, protection_levels, capacity):
+    """ Use sampled requests of products, to calculate the expected revenue using the given protection-levels. """
+    """ note that input of requests are in descending order of products' prices. """
+#     print("protection-levles = ", protection_levels)
+    n_products = len(products)
+    total_rev = 0
+    remain_cap = capacity
+    for fare_class in range(n_products - 1, -1, -1):
+        price = products[fare_class][1]
+        if fare_class > 0:
+            protection_l = protection_levels[fare_class - 1]
+        else:
+            protection_l = 0
+        request = requests[fare_class]
+        decision = int(min(max(0, remain_cap - protection_l), request))
+#         print("in protL: request = ", request, ", protect-l = ", protection_l, "deicision = ", decision)
+        remain_cap -= decision
+        total_rev += decision * price
+    return (total_rev, remain_cap)
 
 
-# In[18]:
+# In[1]:
 
-def evaluate_EMSR_b(pros, cap, iterations):
+def compare_EMSR_b_with_exact(pros, cap, iterations):
     """Compare the EMSR-b method, with single-static DP model."""
     products, demands,_ = RM_helper.sort_product_demands(pros)
-    problem = RM_approx.Single_EMSR(products, demands, cap)
-    problem.value_func()
-    bid_prices = problem.bid_prices()
-    diff_percent = evaluate_single_static_control(products, demands, cap, bid_prices, iterations)
-    return diff_percent
+    
+    diff_percents = []
+    
+    exact = RM_exact.Single_RM_static(products, demands, cap)
+    exact_bid_prices = exact.get_bid_prices()
+    exact_protection_levels = exact.get_protection_levels()
+    
+    heuri = RM_approx.Single_EMSR(products, demands, cap)
+    heuri_protection_levels = heuri.get_protection_levels()
+
+    for i in range(iterations):
+        requests = RM_helper.sample_single_static_demands(demands)
+#         print("requests = ", requests)
+        exact_rev_bp = eval_single_static_by_bid_prices(products, requests, exact_bid_prices, cap)[0]
+        exact_rev_pl = eval_single_static_by_protection_levels(products, requests, exact_protection_levels, cap)[0]
+
+        heuri_rev_pl = eval_single_static_by_protection_levels(products, requests, heuri_protection_levels, cap)[0]
+
+#         print("exact: bid-price: ", exact_rev_bid_prices, ", protect-l:", exact_rev_prot_levels, "heuri: ", heuri_rev_prot_levels)
+        diff_bid_prices = (exact_rev_bp - heuri_rev_pl) / exact_rev_bp * 100
+        diff_protection_levels = (exact_rev_pl - heuri_rev_pl) / exact_rev_pl * 100
+        
+        diff_percents.append([exact_rev_bp, exact_rev_pl, heuri_rev_pl, diff_bid_prices, diff_protection_levels])
+    return np.mean(diff_percents, 0)
+
 
 def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
     """Visualize the performance of EMSR-b method, against single-static DP model."""
     capacities = [c for c in range(cap_lb, cap_ub + 1, cap_interval)]
-    col_titles = ["mean-diff %"]
+    col_titles = ["exact-bid_prices", "exact-protection_levels", "EMSR-b-protection_levels", "mean-diff_bp %",                   "mean-diff_pl %"]
     
     table_data = []
     
     for cap in capacities:
-        result= [evaluate_EMSR_b(products, cap, iterations)]
+        result= compare_EMSR_b_with_exact(products, cap, iterations)
         
         table_data.append(result)
     
     print(pandas.DataFrame(table_data, capacities, col_titles))
     return table_data
 
-pros = [[1,(17.3, 5.8), 1050], [2, (45.1, 15.0), 567], [3, (39.6, 13.2), 534], [4,(34.0, 11.3),520],        [5, (28, 4.3), 498], [6, (12.2, 3.9), 359]]
-# evaluate_EMSR_b(pros, 80, 20)
+# pros = [[1,(17.3, 5.8), 1050], [2, (45.1, 15.0), 567], [3, (39.6, 13.2), 534], [4,(34.0, 11.3),520]]
+pros = [[1,(17.3, 5.8), 1050], [2, (45.1, 15.0), 950], [3, (39.6, 13.2), 699], [4,(34.0, 11.3),520]]
 cap_lb = 80
-cap_ub = 150
+cap_ub = 160
 cap_interval = 10
-iteration = 20
-data = visualize_perf_EMSR_b(pros, cap_lb, cap_ub,cap_interval,iteration)
-y = [d[0] for d in data]
+iteration = 100
 
-plt.clf()
-x= np.linspace(cap_lb, cap_ub, (cap_ub - cap_lb) / cap_interval + 1)
-plt.plot(x, y, linestyle='dashed', marker='s')
+# data = visualize_perf_EMSR_b(pros, cap_lb, cap_ub,cap_interval,iteration)
+# y = [d[3] for d in data]
+# y2 = [d[4] for d in data]
+
+# plt.clf()
+# x= np.linspace(cap_lb, cap_ub, (cap_ub - cap_lb) / cap_interval + 1)
+# plt.plot(x, y, linestyle='dashed', marker='s', label='by bid-prices')
+# plt.plot(x, y2, linestyle='dashed', marker = 'o', label='by protection-levels')
     
-plt.ylabel('Difference in Expected Revenue(%)')
-plt.xlabel('Resource Capacity')
+# plt.legend()
+# plt.ylabel('Difference in Expected Revenue(%)')
+# plt.xlabel('Resource Capacity')
 # plt.show()
-plt.savefig('single_static_revs_diff')
+# plt.savefig('single_static_revs_diff')
 
 
 # In[ ]:

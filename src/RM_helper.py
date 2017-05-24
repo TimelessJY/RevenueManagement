@@ -93,7 +93,7 @@ def remain_cap(n_states, capacities, state_number):
     return remain_cap
 
 
-# In[81]:
+# In[1]:
 
 def sample_network_demands(demands, total_time):
     """samples a series of index of products, whose request arrives at each period in the given total time """
@@ -113,7 +113,8 @@ def sample_network_demands(demands, total_time):
     return sample_index
 
 def sample_single_static_demands(demands):
-    """samples a series of demands, based on the distributions of demand of each products. """
+    """given demands for products in descending order of their revenue, samples a list of demands for each product 
+    in ascending order of their revenue."""
     sampled_demands = []
     for i in range(len(demands)):
         sample = np.random.normal(demands[i][0], demands[i][1])
@@ -167,22 +168,6 @@ def network_bid_prices(value_func, products, resources, capacities, incidence_ma
 
             bid_price_t.append([round(bp_r, 3) for bp_r in bp_t_s])
         bid_prices.append(bid_price_t)
-    return bid_prices
-
-
-# In[82]:
-
-def single_bid_prices(value_func, products, capacity):
-    """Calculate the bid price in single-static RM problems, for each product, at each capacity level."""
-    bid_prices = []
-# self.value_functions = [[0] * (self.capacity + 1) for _ in range(self.n_products)]
-    for j in range(len(value_func) - 1):
-        bid_price_j = [0]
-        for x in range(1, capacity + 1):
-            bid_price = value_func[j][x] - value_func[j][x-1]
-            bid_price_j.append(round(bid_price, 3))
-            
-        bid_prices.append(bid_price_j)
     return bid_prices
 
 

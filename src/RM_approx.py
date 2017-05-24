@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[4]:
+# In[2]:
 
 import warnings
 import numpy as np
@@ -15,7 +15,7 @@ import RM_helper
 import RM_exact
 
 
-# In[3]:
+# In[14]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -67,10 +67,6 @@ class Single_EMSR():
         for j in range(self.n_products-1):
             if products[j][1] < products[j+1][1]:
                 raise ValueError('The products are not in the descending order of their revenues.')
-        
-    def aggregated_demands(self, j):
-        """helper func: returns the aggregated future demand for classes j, j - 1, ... 1"""
-        return sum(self.demands[k][0] for k in range(j + 1))
             
     def weighted_average_revenue(self, j):
         """helper func: returns the weighted average revenue from calsses 1, ... j"""
@@ -81,7 +77,7 @@ class Single_EMSR():
         else:
             return 0
         
-    def calc_protection_levels(self):
+    def get_protection_levels(self):
         """ 
         calculate and return the protection levels for fare classes
         ref: section 2.2.4.2 EMSR-b method
@@ -89,63 +85,25 @@ class Single_EMSR():
         self.protection_levels = [0] * self.n_products
         for j in range(self.n_products - 1):
             weighted_average_rev = self.weighted_average_revenue(j)
-            future_demands = self.aggregated_demands(j)
+            # aggregate the future demand for classes j, j - 1, ... 1
             mean = sum(self.demands[k][0] for k in range(j+1))
             std = math.sqrt(sum(self.demands[k][1] ** 2 for k in range(j+1)))
+            
             prob = self.products[j + 1][1] / weighted_average_rev
             distribution = scipy.stats.norm(mean, std)
             yj = round(distribution.isf(prob), 2)
-            self.protection_levels[j] = min(yj, self.capacity)
+            self.protection_levels[j] = yj
+        self.protection_levels[-1] = self.capacity
         return self.protection_levels
-    
-    def calc_val(self, x, j, dj):
-        """helper func: calculate value function for remaining capacity x, fare class j, and demand for that class dj"""
-        if j > 0:
-            u = min(dj, max(x - math.floor(self.protection_levels[j-1]), 0))
-            val = self.products[j][1] * u + self.value_functions[j-1][x-u]
-        else:
-            u = min(dj, max(x, 0))
-            val = self.products[j][1] * u
-        return val
-    
-    def value_func(self):
-        """Calculate the value functions of this problem, using the protection levels for the products."""
-        
-        self.value_functions = [[0] * (self.capacity + 1) for _ in range(self.n_products)]
-        if not self.protection_levels:
-            self.calc_protection_levels()
-        
-        for j in range(self.n_products):
-            for x in range(self.capacity + 1):
-                val = 0
-                normal_distr = scipy.stats.norm(self.demands[j][0],self.demands[j][1])
-                dj = 0
-                while (normal_distr.pdf(dj) > 1e-5) or (dj < self.demands[j][0]):
-                    prob_dj = normal_distr.pdf(dj)
-                    val += prob_dj * self.calc_val(x,j,dj)
-                    dj += 1
-                
-                self.value_functions[j][x] = val
 
-#         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity], \
-#               ", with protection levels=", self.protection_levels) 
-        return (self.value_functions, self.protection_levels)
-                
-    def bid_prices(self):
-        if not self.value_functions:
-            self.value_func()
-        return RM_helper.single_bid_prices(self.value_functions, self.products, self.capacity)
-    
 start_time = time.time()
 products = [[1, 1050], [2,567], [3, 534], [4,520]]
 # products = [[1, 1050], [2,950], [3, 699], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 # problem = Single_EMSR(products, demands, 80)
-# result = problem.value_func()
-# print(result)
-# print(problem.bid_prices())
+# print(problem.get_protection_levels())
 
-print("--- %s seconds ---" % (time.time() - start_time))
+# print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # In[2]:

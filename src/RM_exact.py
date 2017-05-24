@@ -16,7 +16,7 @@ sys.path.append('.')
 import RM_helper
 
 
-# In[3]:
+# In[45]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -45,11 +45,15 @@ class Single_RM_static():
             size n_products * (capacity + 1)
         protection_levels: 2D np array
             contains the time-dependent optimal protection level for each class
-            size total_time * n_products
+            size n_products
+        bid_prices: 2D np array
+            contains the bid-price for each product with different remaining capacity of the resource
+            size (n_products - 1) * (capacity + 1)
     """
     
     value_functions = []
     protection_levels = []
+    bid_prices = []
     
     def __init__(self, products, demands, capacity):
         """Return a framework for a single-resource RM problem."""
@@ -74,25 +78,26 @@ class Single_RM_static():
         self.protection_levels = [0] * self.n_products
         
         for j in range(self.n_products):
-            for x in range(self.capacity + 1):
-                normal_distr = scipy.stats.norm(self.demands[j][0], self.demands[j][1])
-                
+            
+            price = self.products[j][1]
+            normal_distr = scipy.stats.norm(self.demands[j][0], self.demands[j][1])
+            
+            for x in range(self.capacity + 1):    
                 val = 0
                 dj = 0
                 while (normal_distr.pdf(dj) > 1e-5) or (dj < self.demands[j][0]):
                     prob_dj = normal_distr.pdf(dj)
                     if j > 0:
                         u = min(dj, max(x-self.protection_levels[j-1], 0))
-                        max_val = self.products[j][1] * u + self.value_functions[j-1][x-u]
+                        max_val = price * u + self.value_functions[j-1][x-u]
                     else:
                         u = min(dj, x)
-                        max_val = self.products[j][1] * u
+                        max_val = price * u
                         
                     val += prob_dj * max_val
                     dj += 1
                 
                 self.value_functions[j][x] = val
-                
                 
             # calculates protection levels for the current fare class    
             if j < (self.n_products - 1):
@@ -100,15 +105,30 @@ class Single_RM_static():
                     if self.products[j+1][1] < (self.value_functions[j][x] - self.value_functions[j][x -1]):
                         self.protection_levels[j] = x
                         break
-#         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity], \
-#               ", with protection levels=", self.protection_levels)
-        return (self.value_functions, self.protection_levels)
-    
-    def bid_prices(self):
+            self.protection_levels[-1] = self.capacity
+            
+#         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity])
+#         print(self.value_functions)
+#         print(self.protection_levels)
+        
+    def get_bid_prices(self):
         if not self.value_functions:
             self.value_func()
-        return RM_helper.single_bid_prices(self.value_functions, self.products, self.capacity)
-
+        
+        self.bid_prices = [[0] * (self.capacity + 1) for _ in range(self.n_products - 1)]
+        for j in range(1, self.n_products):
+            value_func_prev = self.value_functions[j - 1]
+            for x in range(1, self.capacity + 1):
+                bid_price = value_func_prev[x] - value_func_prev[x-1]
+                self.bid_prices[j - 1][x] = round(bid_price, 3)
+                
+        return self.bid_prices
+    
+    def get_protection_levels(self):
+        if not self.value_functions:
+            self.value_func()
+            
+        return self.protection_levels
 
 start_time = time.time()
 # Examples, ref: example 2.3, 2.4 in "The Theory and Practice of Revenue Management"
@@ -117,11 +137,10 @@ products = [[1, 1050], [2,567], [3, 534], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 cap = 80
 problem = Single_RM_static(products, demands, cap)
-# vf = problem.value_func()
-# print(vf)
-# bp = problem.bid_prices()
-# print(bp)
-print("--- %s seconds ---" % (time.time() - start_time))
+# problem.value_func()
+# print(problem.get_protection_levels())
+# print(problem.get_bid_prices())
+# print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # In[4]:
