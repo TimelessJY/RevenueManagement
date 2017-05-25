@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 import warnings
 import numpy as np
@@ -305,7 +305,7 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[3]:
+# In[29]:
 
 ##############################
 ###### network_DAVN ##########
@@ -636,7 +636,7 @@ capacities = [60, 60]
 # print(vf)
 
 
-# In[4]:
+# In[35]:
 
 ##############################
 ###### iterative_DAVN ########
@@ -709,90 +709,26 @@ def iterative_DAVN(products, resources, demands, n_virtual_class, capacities, re
     print("after 100 rounds, haven't converged")
     return (static_bid_prices, value_funcs[1])
     
-products = [['1a', 1050], ['2a',950], ['3a', 699], ['4a',520],['1b', 501], ['2b', 352], ['3b', 722], ['1ab', 760],            ['2ab', 1400]]
+# products = [['1a', 1050], ['2a',950], ['3a', 699], ['4a',520],['1b', 501], ['2b', 352], ['3b', 722], ['1ab', 760],\
+#             ['2ab', 1400]]
 
-demands = [['1a', (17.3, 5.8)], ['2a', (45.1, 15.0)],['3a', (39.6, 13.2)],['4a', (34.0, 11.3)], ['1b', (20, 3.5)],            ['2b', (63.1, 2.5)], ['3b', (22.5, 6.1)], ['1ab', (11.5, 2.1)], ['2ab', (24.3, 6.4)]]
+# demands = [['1a', (17.3, 5.8)], ['2a', (45.1, 15.0)],['3a', (39.6, 13.2)],['4a', (34.0, 11.3)], ['1b', (20, 3.5)], \
+#            ['2b', (63.1, 2.5)], ['3b', (22.5, 6.1)], ['1ab', (11.5, 2.1)], ['2ab', (24.3, 6.4)]]
 
-resources=['a', 'b']
-capacities = [130,130]
+# resources=['a', 'b']
+# capacities = [130,130]
 
 # iterative_DAVN(products, resources, demands, 1, capacities, capacities)
 
 
-# In[7]:
+# In[16]:
 
-##############################
-###### network_DLP ###########
-##############################
-import cvxopt
-from cvxopt import matrix, solvers, glpk
 
-def network_DLP(products, resources, demands, capacities):
-    """Solve a multiple-resource revenue management problem using Deterministic Linear Programming.
-        Given:
-        ----------
-        products: 2D np array
-            contains products, each represented in the form of [product_name, expected_revenue], 
-            ordered in descending order of revenue
-            size n_products * 2
-        demands: 2D np array
-            contains the mean and std of the demand distribution for each product
-            size total_time * n_products
-        capacity: integer
-            the total capacity C, remaining capacity x ranges from 0 to C
-        total_time: integer
-            the max time period T, time period t ranges from 1 to T
-    """
-    n_products = len(products)
-    n_resources = len(resources)
-        
-    if len(demands) > 1:
-        D = [[sum(d[j][0]) for d in demands] for j in range(n_products)]
-        mu = [d/len(demands) for d in D]
-    else:
-        D = [d[0] for d in demands[0]]
-        mu = D
-    
-    A = RM_helper.calc_incidence_matrix(products, resources)
-    c = matrix([-float(product[1]) for product in products])
-    h = np.array(capacities + [0] * n_products + mu).astype(float)
-    h = matrix(h)
-    G = [0] * n_products
-    for i in range(n_products):
-        row = helper_row_G(A, i, n_products)
-        G[i] = row
-    G = np.asarray(G).astype(float).tolist()
-    G = matrix(G)
-    cvxopt.solvers.options['show_progress'] = False
-    sol = solvers.lp(c, G, h)
-    print(sol['x'])
-    print("sol1:val=",sol['primal objective'])
-    print("sol1:dual_sol=", sol['dual objective'])
-    print("sol1:dual_var=", sol['z'])
-    
-    print("int solutions:")
-    integer_index = [i for i in range(n_products)]
-    (status, x) = glpk.ilp(c,G,h, I=set(integer_index))
-    int_sol=np.array(x)
-    print("value=", round((c.T*x)[0], 2))
-    
-def helper_row_G(A, i, n_products):
-    row1 = [a[i] for a in A]
-    row2 = [0] * n_products
-    row2[i] = -1
-    row3 = [0] * n_products
-    row3[i] = 1
-    return row1+row2+row3
-    
-products = [['1a', (17.3, 5.8), 1050], ['2a', (45.1, 15.0),950], ['3a', (39.6, 13.2), 699], ['4a', (34.0, 11.3),520],            ['1b', (20, 3.5), 501], ['2b', (63.1, 2.5), 352], ['3b', (22.5, 6.1), 722], ['1ab', (11.5, 2.1), 760],            ['2ab', (24.3, 6.4), 1400]]
 
-resources = ['a', 'b']
-capacities = [30,30]
-np.set_printoptions(threshold='nan')
-(pros, demands, demands_with_names) = RM_helper.sort_product_demands(products)
-# print(pros)
-# print(demands)
-# network_DLP(pros, resources, [demands], capacities)
+
+# In[37]:
+
+
 
 
 # In[ ]:

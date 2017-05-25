@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[7]:
+# In[1]:
 
 import numpy as np
 import scipy.stats
@@ -366,9 +366,273 @@ problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[ ]:
+# In[150]:
+
+import pulp
+
+class ALP():
+    """ADP algorithm, using Linear Programming approach, DP model with feature-extraction method.
+    ref: An Approximate Dynamic Programming Approach to Network Revenue Mangement. """
+    incidence_matrix = []
+    approximations = []
+    default_method = "separable_affine"
+    
+    def __init__(self, products, resources, demands, capacities, total_time, arrival_rates):
+        
+        self.products = products
+        self.resources = resources
+        self.demands = demands
+        self.capacities = capacities
+        self.total_time = total_time
+        self.n_products = len(products)
+        self.n_resources = len(resources)
+        self.n_demand_periods = len(demands)
+        self.product_names = [p[0] for p in products]
+        self.prices = dict(products)
+        self.arrival_rates = arrival_rates
+        
+#         self.n_states = 1
+        
+#         for c in self.capacities:
+#             self.n_states *= (c+1)
+            
+        self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
 
 
+    def solve_DLP(self, remain_cap, curr_time):
+        """in step 1: solves a DLP model, with the given remaining capacity, and the current time period; returns bid
+        prices for resources. """
+        DLP_model = pulp.LpProblem('DLP model', pulp.LpMaximize)
+        y = pulp.LpVariable.dict('y_%s', self.product_names, lowBound= 0)
+        # objective function
+        DLP_model += sum([self.prices[j] * y[j] for j in self.product_names])
+        # constraints 1, for each resource, the sum of products of consumption py each product and the booking limit of 
+        # that product is less than the total capacity of that resource
+        constraints = []
+        for i in range(self.n_resources):
+            incidence = self.incidence_matrix[i]
+            incidence_vector = dict(zip(self.product_names, incidence))
+            cap = remain_cap[i]
+            c = sum([incidence_vector[i] * y[i] for i in self.product_names]) <= cap
+            constraints.append(c)
+            DLP_model += c, "c"+str(i)
+        # constraints2, every booking limit should be less than the corresponding demand
+        if self.n_demand_periods > 1:
+            means = [d[0] for d in self.demands[curr_time]]
+        else:
+            means = [d[0] for d in self.demands[0]]
+        means_vector = dict(zip(self.product_names, means))
+        for j in self.product_names:
+            DLP_model += y[j] <= means_vector[j]
+                  
+        DLP_model.solve()
+#         print(DLP_model)
+        
+        bid_prices = [c.pi for c in constraints]
+        print("bid-prices= ", bid_prices)
+        return bid_prices
+    
+    def simulate_bid_prices_control(self, initial_state, bid_prices):
+        # sample request for 1 time period
+        print("initial_state = ", initial_state)
+        sampled_request  = RM_helper.sample_network_demands(self.arrival_rates, 1)[0]
+        print("sampled request index ", sampled_request)
+        # simulate a 1-time-period bid-price control
+        new_state = initial_state[:]
+        if sampled_request < self.n_products:
+            # a request actually occurs
+            print("request for product ", self.products[sampled_request][1])
+            incidence = [row[sampled_request] for row in self.incidence_matrix]
+            print("incidence=", incidence)
+            if incidence <= initial_state and np.dot(incidence, bid_prices) <= self.products[sampled_request][1]:
+                new_state = [new_i - inc_i for new_i, inc_i in zip(new_state, incidence)]
+        return new_state
+        
+    def sample_visited_states(self, K):
+        """Step 1: simulate K times, get a bid-price control policy, then use it to simulate a control, 
+        and gather all visited states(in the form of remaining capacity of resources)"""
+        visited_states = []
+        curr_state = self.capacities[:]
+        visited_states.append(curr_state)
+        for i in range(K - 1):
+            bid_prices = self.solve_DLP(curr_state, i)
+            next_state = self.simulate_bid_prices_control(curr_state, bid_prices)
+            visited_states.append(next_state)
+            curr_state = next_state
+        return visited_states
+    
+    def solve_RLP(self, sampled_states):
+        """Step 2: use sampled states, to formulate and solve Relaxed LP"""
+        """in step 1: solves a DLP model, with the given remaining capacity, and the current time period; returns bid
+        prices for resources. """
+        RLP_model = pulp.LpProblem('RLP model', pulp.LpMinimize)
+#         names = [[(self.resources[i] + '-' + str(x)) for x in range(self.capacities[i])] for i in range(self.resources)]
+        names = []
+        flattened_names = []
+        for t in range(self.total_time):
+            name_t = []
+            for i in range(self.n_resources):
+                name_i = []
+                for x in range(self.capacities[i] + 1):
+                    name = self.resources[i] + '-' + str(t) + '-' + str(x)
+                    name_i.append(name)
+                    flattened_names.append(name)
+                name_t.append(name_i)
+            names.append(name_t)
+#         print(names)
+#         print(flattened_names)
+        
+        r = pulp.LpVariable.dict('r_%s', flattened_names, lowBound= 0)
+        # objective function
+        names_initial = [names[0][i] for i in range(self.n_resources)]
+        flattened_names_initial = np.concatenate(names_initial, axis=0).tolist()
+#         print("names", names_initial, flattened_names_initial)
+        
+        r_initial = [r[name] for name in flattened_names_initial]
+        print(r_initial)
+        RLP_model += sum(r_initial)
+        
+        # constraints 1, for each sampled state, TJ <= J
+        constraints = []
+        for t in range(len(sampled_states)):
+            s = sampled_states[t]
+            # calculate RHS, i.e. J(s)
+            basis_func_s = self.generate_basis_func(s) # basis function
+#             print("basis_func", basis_func_s)
+            r_s_t = [[r[name] for name in n_i] for n_i in names[t]] # weights
+#             print("r_s_t", r_s_t)
+            RHS = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t)])
+            print("RHS=",RHS)
+#             print(c)
+            
+            # calculate LHS, i.e. TJ(s)
+            
+            f_s = self.find_available_products(s) # available products
+#             print(f_s)
+            LHS = 0
+    
+            if t < (self.total_time - 1):
+                r_s_t_next = [[r[name] for name in n_i] for n_i in names[t + 1]] # weights of next time periods
+                J_s = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t_next)])
+#                 print("J_S = ", J_s)
+                total_arrival_rate = 0
+                for f in f_s:
+                    arrival_rate = self.arrival_rates[f]
+                    total_arrival_rate += arrival_rate
+                    
+                    A_f = [row[f] for row in self.incidence_matrix]
+                    s_f = [s_i - f_i for s_i, f_i in zip(s, A_f)]
+#                     print("s_f", s_f)
+                    basis_func_s_f = self.generate_basis_func(s_f)
+                    J_s_f = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s_f, r_s_t_next)])
+#                     print("J_sf = ", J_s_f)
+#                     !!!!!!!!!!!!!!!!!!!!!!! modify here
+#                     LHS += arrival_rate * max(self.products[f][1] + J_s_f, J_s)
+                    LHS += arrival_rate * (self.products[f][1] + J_s_f)
+                    
+                LHS += (1- total_arrival_rate) * J_s
+            else:
+                LHS = sum([self.arrival_rates[f] * self.products[f][1] for f in f_s])
+#                 for f in f_s:
+#                     LHS += self.arrival_rates[f] * self.products[f][1]
+            
+            print("LHS = ", LHS)
+            
+            constraint = LHS <= RHS
+            RLP_model += constraint, "c" + str(t)
+            
+            
+        # constraints 2, at each time period, for each resource, weights are in decreasing order
+        for t in range(self.total_time):
+            for i in range(self.n_resources):
+                var_names = names[t][i]
+#                 print("var_names", var_names, "initial_cap = ", self.capacities)
+                for x in range(1, self.capacities[i]):
+#                     print("var: ", r[var_names[x]])
+                    constraint = r[var_names[x]] >= r[var_names[x+1]]
+                    RLP_model += constraint
+                
+        RLP_model.solve()
+        print(RLP_model)
+        for n in flattened_names:
+            print(n, r[n].value())
+        
+        
+    def generate_basis_func(self, remain_cap):
+        """helper func: generate basis function given the remaining capacity at the current time."""
+        basis_funcs = []
+        for i in range(self.n_resources):
+            x_l = remain_cap[i] # remaining capacity for resource i
+            b_f = [1] * (x_l + 1)
+            zeros = [0] * (self.capacities[i] - x_l)
+            b_f += zeros
+            
+            basis_funcs.append(b_f)
+        return basis_funcs
+    
+    def find_available_products(self, remain_cap):
+        """helper func: find all products whose consumptions of resources doesn't exceed current capacities. """
+        avail_prod = []
+        for j in range(self.n_products):
+            incidence = [row[j] for row in self.incidence_matrix]
+            if all(incidence[i] <= remain_cap[i] for i in range(self.n_resources)):
+                avail_prod.append(j)
+        return avail_prod
+    
+p = [['1a', (17.3, 5.8), 1050], ['2a', (45.1, 15.0),950], ['3a', (39.6, 13.2), 699], ['4a', (34.0, 11.3),520],            ['1b', (20, 3.5), 501], ['2b', (63.1, 2.5), 352], ['3b', (22.5, 6.1), 722], ['1ab', (11.5, 2.1), 760],            ['2ab', (24.3, 6.4), 1400]]
+
+resources = ['a', 'b']
+capacities = [3,5]
+
+arrival_rate = [0.1, 0.2, 0.04,0.06, 0.01, 0.08, 0.23, 0.11, 0.34]
+pros, demands, _ = RM_helper.sort_product_demands(p)
+problem = ALP(pros, resources, [demands], capacities, 3, arrival_rate)
+problem.solve_DLP(capacities, 3)
+# problem.sample_visited_states(30)
+# print(problem.incidence_matrix)
+# print(pros)
+# print(problem.find_available_products([0,1]))
+problem.solve_RLP([[1, 1]])
+
+
+# In[75]:
+
+def solve_DLP():
+    """in step 1: solves a DLP model, with the given remaining capacity, and the current time period; returns bid
+    prices for resources. """
+    DLP_model = pulp.LpProblem('DLP model', pulp.LpMaximize)
+    names = [['a1', 'b1'], ['a2', 'b2']]
+    flattern_names = np.array(names).ravel().tolist()
+    prices = [[12, 23],[34,45]]
+    y = pulp.LpVariable.dict('y_%s', flattern_names, lowBound= 0)
+    # objective function
+    DLP_model += sum([prices[i][j] * y[names[i][j]] for j in range(2) for i in range(2)])
+    # constraints 1, for each resource, the sum of products of consumption py each product and the booking limit of 
+    # that product is less than the total capacity of that resource
+    constraints = []
+    for i in range(2):
+        p = [1,2]
+        ps = dict(zip(names[i], p))
+        print("ps = ", ps)
+        c = sum([ps[j] * y[j] for j in names[i]]) <= 20
+        constraints.append(c)
+        DLP_model += c, "c"+str(i)
+    # constraints2, every booking limit should be less than the corresponding demand
+    DLP_model.solve()
+    print(DLP_model)
+
+    bid_prices = [c.pi for c in constraints]
+#         print("bid-prices= ", bid_prices)
+    return bid_prices
+
+solve_DLP()
+
+
+# In[73]:
+
+a = [[1,2], [3,4]]
+print(np.array(a).ravel().tolist())
+print(a)
 
 
 # In[ ]:
