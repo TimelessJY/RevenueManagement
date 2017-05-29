@@ -11,23 +11,9 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-# In[105]:
+# In[106]:
 
 def sort_product_demands(products):
-    """
-    sorts the given products of form:[product_name, demand, revenue], into a list of [product_name, revenue]
-    and a list of demands, according to the descending order of the revenue of each product
-    """
-    n_products = len(products)
-    demands = []
-    demands_with_name = []
-    products.sort(key = lambda tup: tup[2], reverse=True)
-    demands = [p[1] for p in products]
-    demands_with_name = [[p[0], p[1]] for p in products]
-    products = [[p[0], p[2]] for p in products]
-    return (products, demands, demands_with_name)
-
-def sort_product_demands_NEW(products):
     """
     sorts the given products of form:[product_name, demand, revenue], into a list of [product_name, revenue]
     and a list of demands, according to the descending order of the revenue of each product
@@ -72,7 +58,7 @@ def calc_incidence_matrix(products, resources):
     return incidence_matrix
 
 
-# In[62]:
+# In[107]:
 
 def state_index(n_states, capacities, remain_cap):
     """converts the given array of remaining capacities into the state number"""
@@ -109,7 +95,7 @@ def remain_cap(n_states, capacities, state_number):
     return remain_cap
 
 
-# In[1]:
+# In[108]:
 
 def sample_network_demands(demands, total_time):
     """samples a series of index of products, whose request arrives at each period in the given total time """
@@ -139,7 +125,7 @@ def sample_single_static_demands(demands):
     return sampled_demands
 
 
-# In[68]:
+# In[109]:
 
 def network_bid_prices(value_func, products, resources, capacities, incidence_matrix, n_states):
     """Calculate the bid prices for resources at every state in every time period."""
@@ -187,7 +173,7 @@ def network_bid_prices(value_func, products, resources, capacities, incidence_ma
     return bid_prices
 
 
-# In[103]:
+# In[110]:
 
 def extract_legs_info(products, resources):
     """plots a graph of flights, produces the incidence matrix, and returns a complete list of flight itineraries."""

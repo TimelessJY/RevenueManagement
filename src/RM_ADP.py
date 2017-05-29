@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 import numpy as np
 import scipy.stats
@@ -15,7 +15,7 @@ import RM_helper
 import pulp
 
 
-# In[3]:
+# In[15]:
 
 ##############################################
 ###### ADP: using one-state_transition #######
@@ -166,7 +166,7 @@ class One_state_transition():
         return self.approximations[0][-1]
 
 
-ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601],       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
+ps = [['a1', 200, 0.02], ['a2', 503, 0.06], ['ab1', 400, 0.08],['ab2', 704, 0.01], ['ab3', 601, 0.05],       ['ab4', 106, 0.12], ['bc', 920, 0.03],['c1', 832, 0.07]]
 products,demands, _ = RM_helper.sort_product_demands(ps)
 demands = [demands]
 resources = ['a', 'b', 'c']
@@ -174,13 +174,13 @@ capacities = [8] * 3
 
 start_time = time.time()
 problem = One_state_transition(products, resources, demands, capacities, 10)
-vf = problem.value_func(1000)
-# print(problem.bid_prices()
+# vf = problem.value_func(1000)
+# print(problem.bid_prices())
 # print(vf)
-print("--- %s seconds ---" % (time.time() - start_time))
+# print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[13]:
+# In[7]:
 
 #############################################
 ###### ADP: DP with feature extraction ######
@@ -352,7 +352,7 @@ class DP_w_featureExtraction():
 # resources = ['a', 'b', 'c']
 # capacities = [8] * 3
 
-ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['ab3', 0.05, 601],       ['ab4', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
+ps = [['a1', 200, 0.02], ['a2', 503, 0.06], ['ab1', 400, 0.08],['ab2', 704, 0.01], ['ab3', 601, 0.05],       ['ab4', 106, 0.12], ['bc', 920, 0.03],['c1', 832, 0.07]]
 products,demands, _ = RM_helper.sort_product_demands(ps)
 demands = [demands]
 resources = ['a', 'b', 'c']
@@ -360,14 +360,14 @@ capacities = [5] * 3
 
 start_time = time.time()
 problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
-# vf = problem.value_func()
+vf = problem.value_func()
 # print(vf)
 # print(problem.bid_prices())
 # print(problem.total_expected_revenue())
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[17]:
+# In[ ]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -606,7 +606,7 @@ class ALP():
         bid_prices_collected = self.collect_bid_prices(varsdict, varsnames)
         return bid_prices_collected
         
-p = [['1a', (17.3, 5.8), 1050], ['2a', (45.1, 15.0),950], ['3a', (39.6, 13.2), 699], ['4a', (34.0, 11.3),520],            ['1b', (20, 3.5), 501], ['2b', (63.1, 2.5), 352], ['3b', (22.5, 6.1), 722], ['1ab', (11.5, 2.1), 760],            ['2ab', (24.3, 6.4), 1400]]
+p = [['1a', 1050, (17.3, 5.8)], ['2a',950, (45.1, 15.0)], ['3a', 699, (39.6, 13.2)], ['4a',520, (34.0, 11.3)],            ['1b', 501, (20, 3.5)], ['2b', 352, (63.1, 2.5)], ['3b', 722, (22.5, 6.1)], ['1ab', 760, (11.5, 2.1)],            ['2ab', 1400, (24.3, 6.4)]]
 
 resources = ['a', 'b']
 capacities = [3,5]
