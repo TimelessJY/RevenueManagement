@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[88]:
+# In[104]:
 
 import numpy as np
 import time
@@ -11,7 +11,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-# In[56]:
+# In[105]:
 
 def sort_product_demands(products):
     """
@@ -25,6 +25,20 @@ def sort_product_demands(products):
     demands = [p[1] for p in products]
     demands_with_name = [[p[0], p[1]] for p in products]
     products = [[p[0], p[2]] for p in products]
+    return (products, demands, demands_with_name)
+
+def sort_product_demands_NEW(products):
+    """
+    sorts the given products of form:[product_name, demand, revenue], into a list of [product_name, revenue]
+    and a list of demands, according to the descending order of the revenue of each product
+    """
+    n_products = len(products)
+    demands = []
+    demands_with_name = []
+    products.sort(key = lambda tup: tup[1], reverse=True)
+    demands = [p[2] for p in products]
+    demands_with_name = [[p[0], p[2]] for p in products]
+    products = [[p[0], p[1]] for p in products]
     return (products, demands, demands_with_name)
 
 def marginal_value_check(value_func):

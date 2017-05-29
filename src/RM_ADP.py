@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 import numpy as np
 import scipy.stats
@@ -12,6 +12,7 @@ import bisect
 import sys
 sys.path.append('.')
 import RM_helper
+import pulp
 
 
 # In[3]:
@@ -366,9 +367,11 @@ problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[43]:
+# In[17]:
 
-import pulp
+##################################################################
+###### ADP: LP with feature extraction, and states sampling ######
+##################################################################
 
 class ALP():
     """ADP algorithm, using Linear Programming approach, DP model with feature-extraction method.
@@ -493,7 +496,7 @@ class ALP():
             for i in range(self.n_resources):
                 name_i = []
                 for x in range(self.capacities[i] + 1):
-                    name = self.resources[i] + '-' + str(t) + '-' + str(x)
+                    name = '-'.join([self.resources[i], str(t), str(x)])
                     name_i.append(name)
                     flattened_names.append(name)
                 name_t.append(name_i)
@@ -587,7 +590,7 @@ class ALP():
                 bid_prices_t_s = [0] * self.n_resources
                 remain_cap = RM_helper.remain_cap(self.n_states, self.capacities, s)
                 for i in range(self.n_resources):
-                    var_name = 'r' + '_' + self.resources[i] + '_' + str(t) + '_' + str(remain_cap[i])
+                    var_name = '_'.join(['r', self.resources[i], str(t), str(remain_cap[i])])
                     bid_prices_t_s[i] = max(varsdict[var_name], 0)
                 bid_prices_t.append(bid_prices_t_s)
             bid_prices.append(bid_prices_t)
@@ -609,54 +612,9 @@ resources = ['a', 'b']
 capacities = [3,5]
 
 arrival_rate = [0.1, 0.2, 0.04,0.06, 0.01, 0.08, 0.23, 0.11, 0.14]
-pros, demands, _ = RM_helper.sort_product_demands(p)
-problem = ALP(pros, resources, [demands], capacities, 3, arrival_rate)
-problem.get_bid_prices(3)
-
-
-# In[24]:
-
-def solve_DLP():
-    """in step 1: solves a DLP model, with the given remaining capacity, and the current time period; returns bid
-    prices for resources. """
-    DLP_model = pulp.LpProblem('DLP model', pulp.LpMaximize)
-    names = [['a1', 'b1'], ['a2', 'b2']]
-    flattern_names = np.array(names).ravel().tolist()
-    prices = [[12, 23],[34,45]]
-    y = pulp.LpVariable.dict('y_%s', flattern_names, lowBound= 0)
-    # objective function
-    DLP_model += sum([prices[i][j] * y[names[i][j]] for j in range(2) for i in range(2)])
-    # constraints 1, for each resource, the sum of products of consumption py each product and the booking limit of 
-    # that product is less than the total capacity of that resource
-    constraints = []
-    for i in range(2):
-        p = [1,2]
-        ps = dict(zip(names[i], p))
-        print("ps = ", ps)
-        c = sum([ps[j] * y[j] for j in names[i]]) <= 20
-        constraints.append(c)
-        DLP_model += c, "c"+str(i)
-    # constraints2, every booking limit should be less than the corresponding demand
-    DLP_model.solve()
-    print(DLP_model)
-
-    bid_prices = [c.pi for c in constraints]
-#         print("bid-prices= ", bid_prices)
-    return bid_prices
-
-solve_DLP()
-
-
-# In[73]:
-
-a = [[1,2], [3,4]]
-print(np.array(a).ravel().tolist())
-print(a)
-
-
-# In[2]:
-
-str([1,2])
+# pros, demands, _ = RM_helper.sort_product_demands(p)
+# problem = ALP(pros, resources, [demands], capacities, 10, arrival_rate)
+# problem.get_bid_prices(10)
 
 
 # In[ ]:

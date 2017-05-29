@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[18]:
+# In[2]:
 
 import pandas
 import time
@@ -497,6 +497,118 @@ iteration = 100
 # plt.xlabel('Resource Capacity')
 # plt.show()
 # plt.savefig('single_static_revs_diff')
+
+
+# In[36]:
+
+def simulate_single_static_bidprices_control(bid_prices, products, demands, capacity):
+    """Simulates bid-price control over the horizon T, on a single-static problem, with initial capacity given. 
+    ----------------------------
+    Inputs:
+        bid_prices: bid prices of methods to be simulated
+        products: i.e. itineraries, assumed to be sorted in descending order of revenus, in the form of 
+                (name, revenue)
+        demands: mean and std of demand distribution for products, in the same order as the products are given
+        capacity: initial capacity of the resource
+    Returns: total revenue and load factor of each method. """
+    
+    n_methods = len(bid_prices)
+    requests = RM_helper.sample_single_static_demands(demands)
+    revs = [0] * n_methods # records the total revenue using bid prices produced by the two methods, i.e. bid_prices
+    curr_cap = [capacity] * n_methods
+
+    n_products = len(products)
+    for m in range(n_methods):
+        for fare_class in range(n_products - 1, 0, -1):
+            price = products[fare_class][1]
+            bid_price_j = bid_prices[m][fare_class - 1]
+            remain_cap = curr_cap[m]
+            if price >= bid_price_j[remain_cap]:
+                # only sell product of current fare class if its profit exceeds the bid price of current class
+                for z in range(min(requests[fare_class], remain_cap), -1, -1):
+                    if price >= bid_price_j[remain_cap - z]:
+                        curr_cap[m] -= z
+                        revs[m] += price * z
+                        break
+        # for the highest fare class, accept all requests
+        request = requests[0]
+        z = min(request, remain_cap)
+        curr_cap[m] -= z
+        revs[m] += products[0][1] * z
+    
+    result = [(revs[m], round(curr_cap[m] / capacity * 100,3)) for m in range(n_methods)]
+    return result
+
+pros = [[1,(17.3, 5.8), 1050], [2, (45.1, 15.0), 950], [3, (39.6, 13.2), 699], [4,(34.0, 11.3),520]]
+cap = 80
+# products, demands, _ = RM_helper.sort_product_demands(pros)
+# exact = RM_exact.Single_RM_static(products, demands, cap)
+# exact_bid_prices = exact.get_bid_prices()
+# simulate_single_static_bidprices_control([exact_bid_prices], products, demands, cap)
+
+
+# In[37]:
+
+def simulate_network_bidprices_control(bid_prices, products, arrival_rates, capacities, T):
+    """Simulates bid-price control over the horizon T, on a network problems, with initial capacity given. 
+    ----------------------------
+    Inputs:
+        bid_prices: bid prices of methods to be simulated
+        products: i.e. itineraries, assumed to be sorted in descending order of revenus, in the form of 
+                (name, revenue)
+        arrival_rate: arrival rates of demands, in the same order as the products are given
+        capacities: initial capacities of resources
+        T: total time, i.e. sales horizon
+    Returns: total revenue and load factor of each method. """
+    
+    n_methods = len(bid_prices)
+    incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
+    requests = RM_helper.sample_network_demands(arrival_rates, T)
+    revs = [0] * n_methods # records the total revenue using bid prices produced by the two methods, i.e. bid_prices
+    curr_caps = [capacities[:]] * n_methods
+
+    total_states = 1
+    for c in capacities:
+        total_states *= (c+1)
+
+    for t in range(T):
+        prod_requested = requests[t]
+        if prod_requested < len(products):
+            # a request arrives
+            incidence_vector = [row[prod_requested] for row in incidence_matrix]
+            state_index = [RM_helper.state_index(total_states, capacities, curr_caps[i]) for i in range(n_methods)]
+
+            profit = products[prod_requested][1]
+            for i in range(n_methods):
+                if t < (T - 1): 
+                    bp_t = bid_prices[i][t+1][state_index[i]]
+                    opportunity_cost = np.dot(incidence_vector, bp_t)
+                else:
+                    opportunity_cost = 0
+                    
+                remain_cap = [c_i - x_i for c_i, x_i in zip(curr_caps[i], incidence_vector)]
+                
+                if profit >= opportunity_cost and all(c_i >= 0 for c_i in remain_cap):
+                    # decides to sell the product
+                    revs[i] += profit
+                    curr_caps[i] = remain_cap[:]
+                    
+    result = [(revs[i], round(sum(curr_caps[i]) / sum(capacities) * 100, 3)) for i in range(n_methods)]
+    return result
+
+ps = [['a1', 200, 0.22], ['a2', 503, 0.06], ['ab1', 400, 0.18],['ab2', 704, 0.1], ['b1', 601, 0.05],       ['b2', 106, 0.12], ['bc', 920, 0.13],['c1', 832, 0.07]]
+resources = ['a', 'b', 'c']
+capacities = [3,3,3]
+total_time = 10
+# products, arrival_rates,_ = RM_helper.sort_product_demands_NEW(ps)
+# demands = [(a * total_time, 0) for a in arrival_rates]
+# problem = RM_ADP.ALP(products, resources, [demands], capacities, total_time,arrival_rates)
+# bid_prices = problem.get_bid_prices(10)
+# exact_method = RM_exact.Network_RM(products, resources, [arrival_rates], capacities, total_time)
+# exact_method.value_func()
+# exact_bid_prices = exact_method.bid_prices()
+
+# simulate_network_bidprices_control([bid_prices, exact_bid_prices], products, arrival_rates, capacities, total_time)
 
 
 # In[ ]:
