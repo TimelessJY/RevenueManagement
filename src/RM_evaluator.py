@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[62]:
+# In[65]:
 
 import itertools
 import sys
@@ -10,7 +10,7 @@ import RM_helper
 import random
 
 
-# In[63]:
+# In[68]:
 
 PRICE_LIMITS = [150, 250]
 
@@ -19,7 +19,7 @@ def generate_network(n_spokes, demand_model):
     of itineraries. Currently only supports 1 fare class per itinerary. """
     resources = [] # records flight legs names
     itineraries = [] # records names and (revenue, arrival rate) pairs of fare classes of itineraries
-    hub_name = 'HUB'
+    hub_name = 'hub'
     spoke_names = []
     
     # produce flight legs (single-direction)
@@ -89,11 +89,15 @@ def generate_random_price(itinerary_name):
     price = random.randint(50, PRICE_LIMITS[leg_num-1])
     return price
 
-# resources, itineraries = generate_network(3, 1)
-# RM_helper.extract_legs_info(itineraries, resources)
+resources, itineraries = generate_network(3, 1)
+RM_helper.extract_legs_info(itineraries, resources)
 
 
 # In[ ]:
 
-
+def compare_ADP_LP_w_DLP(T_lb, T_ub, T_interval):
+    # 3 spoke situation 
+    
+    
+    
 

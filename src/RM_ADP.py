@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[68]:
 
 import numpy as np
 import scipy.stats
@@ -12,6 +12,8 @@ import bisect
 import sys
 sys.path.append('.')
 import RM_helper
+import RM_exact
+
 import pulp
 
 
@@ -92,7 +94,7 @@ class One_state_transition():
             print("random = ", rand, " fall into ", fall_into)
         return sample_index
     
-    def value_func(self, n_iterations):
+    def calc_value_func(self, n_iterations):
         prev_ests = [[0] * self.n_states for _ in range(self.total_time + 1)]
         n = 1 # iteration counter 
 
@@ -155,13 +157,13 @@ class One_state_transition():
     def bid_prices(self):
         """return the bid prices for resources over all time periods and all remaining capacities situations."""
         if not self.value_functions:
-            self.value_func(self.default_iterations)
+            self.calc_value_func(self.default_iterations)
 
         return RM_helper.network_bid_prices(self.value_functions, self.products, self.resources, self.capacities,                                             self.incidence_matrix, self.n_states)
 
     def total_expected_revenue(self):
         if not self.value_functions:
-            self.value_func(self.default_iterations)
+            self.calc_value_func(self.default_iterations)
             
         return self.approximations[0][-1]
 
@@ -174,13 +176,13 @@ capacities = [8] * 3
 
 start_time = time.time()
 problem = One_state_transition(products, resources, demands, capacities, 10)
-# vf = problem.value_func(1000)
+# vf = problem.calc_value_func(1000)
 # print(problem.bid_prices())
 # print(vf)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[7]:
+# In[76]:
 
 #############################################
 ###### ADP: DP with feature extraction ######
@@ -210,7 +212,7 @@ class DP_w_featureExtraction():
             
         self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
     
-    def value_func(self, feature_approx_method = "", m = 0):
+    def calc_value_func(self, feature_approx_method = "", m = 0):
         """Calculate the value functions, 
         using the given feature approximation method(default as separable affine, ref: An ADP approach to Network RM),
         with m states chosen in each time period to get observations. """
@@ -304,7 +306,7 @@ class DP_w_featureExtraction():
         
     def solve_LLS_prob(self, feature_vectors, m_vals):
         """helper func: solve the linear least square problem, returns whether the B matrix produced by the selected
-        m staes is singular, and if not, the optimal coefficients of basis functions. """
+        m states is singular, and if not, the optimal coefficients of basis functions. """
         m = len(m_vals)
         B = [[0 * (self.n_resources + 1)] for _ in range(self.n_resources + 1)]
         for feature_v in feature_vectors:
@@ -334,13 +336,13 @@ class DP_w_featureExtraction():
     def bid_prices(self):
         """return the bid prices for resources over all time periods and all remaining capacities situations."""
         if not self.approximations:
-            self.value_func(self.default_method)
+            self.calc_value_func(self.default_method)
             
         return RM_helper.network_bid_prices(self.approximations, self.products, self.resources, self.capacities,                                             self.incidence_matrix, self.n_states)
     
     def total_expected_revenue(self):
         if not self.approximations:
-            self.value_func(self.default_method)
+            self.calc_value_func(self.default_method)
             
         return self.approximations[0][-1]
     
@@ -360,14 +362,14 @@ capacities = [5] * 3
 
 start_time = time.time()
 problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
-vf = problem.value_func()
+# vf = problem.calc_value_func()
 # print(vf)
 # print(problem.bid_prices())
 # print(problem.total_expected_revenue())
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[ ]:
+# In[69]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -617,7 +619,164 @@ arrival_rate = [0.1, 0.2, 0.04,0.06, 0.01, 0.08, 0.23, 0.11, 0.14]
 # problem.get_bid_prices(10)
 
 
-# In[ ]:
+# In[100]:
 
+class DLBFA():
+    """ Double-leg based algorithm, using function approximation. 
+    ref: A Discrete-time dynamic programming approach for network airline revenue management. 
+    note that :
+        the products given are in the form of (name, rev, arrival_rate), no explicit demand statistics needed."""
+    dl_resources = [] # contains index of resources in each subnetwork
+    dl_products = [] # contains index of products in each double-leg subnetwork
+    incidence_matrix = []
+    approx_weights = [] # contains the weights of approximations for each subnetwork at each time period
+    
+    def __init__(self, products, resources, capacities, total_time):
+        
+        self.products = products
+        self.resources = resources
+        self.capacities = capacities
+        self.total_time = total_time
+        self.n_products = len(products)
+        self.n_resources = len(resources)
+        self.n_subnets = int(self.n_resources / 2)
+        
+        self.n_states = 1
+        
+        for c in self.capacities:
+            self.n_states *= (c+1)
+            
+        self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
+        
+        self.decompose_DL_subnetworks()
+        
+    def decompose_DL_subnetworks(self):
+        """helper func: decompose a network into several double-leg subnetworks.
+        Only supports single-hub network with spoke names A,B,..., at the moment, and will divide itineraries 
+        between spokes into subnetworks. """
+        
+        self.dl_resources = [[] for i in range(self.n_subnets)]
+        self.dl_products = [[] for i in range(self.n_subnets)]
+        
+        # divide resources(i.e. legs) into subnetworks: legs between every spoke and the hub forms a subnetwork
+        for s in range(self.n_subnets):
+            spoke_name = chr(65 + s)
+            for i in range(self.n_resources):
+                leg = self.resources[i]
+                if spoke_name in leg:
+                    self.dl_resources[s].append(i)
+        
+        # divide products(i.e. itineraries) into subnetworks:
+        # products uses resources across subnetworks are prorated by fares
+        for j in range(self.n_products):
+            resources_used = self.resources_used_by_product(j)
+            if len(resources_used) == 1:
+                # single-leg itinerary
+                spoke_index = self.find_subnet_for_resource(resources_used[0])
+                self.dl_products[spoke_index].append(self.products[j])
+            else:
+                if len(resources_used) > 2:
+                    raise ValueError('Product uses more than 2 resources.') 
+                subnet_1 = self.find_subnet_for_resource(resources_used[0]) 
+                subnet_2 = self.find_subnet_for_resource(resources_used[1])
+                if subnet_1 == subnet_2:
+                    # round trip in a subnetwork, uses both of the legs between a spoke and the hub
+                    self.dl_products[subnet_1].append(self.products[j])
+                else:
+                    # trip between two subnetworks(i.e. two spokes via hub)
+                    if len(self.dl_products[subnet_1]) <= len(self.dl_products[subnet_2]):
+                        self.dl_products[subnet_1].append(self.products[j])
+                    else:
+                        self.dl_products[subnet_2].append(self.products[j])
+                        
+    def resources_used_by_product(self, prod_index):
+        """helper func: given the index of a product, find the index/indicies of resources that it uses. """
+        incidence_vector = [row[prod_index] for row in self.incidence_matrix]
+        return [i for i, x in enumerate(incidence_vector) if x == 1]
+            
+    def find_subnet_for_resource(self, resource_index):
+        """helper func: return the index of subnetwork which contains the given index of resource"""
+        return [s for s in range(self.n_subnets) if resource_index in self.dl_resources[s]][0]
+    
 
+    def calc_value_func(self):
+        """calculate value functions, and find the best fitted weights of the approximation functions. """
+        self.approx_weights = [[] for t in range(self.total_time)]
+        for s in range(self.n_subnets):
+            sub_products, sub_arrival_rates, _ = RM_helper.sort_product_demands(self.dl_products[s])
+            sub_resources, sub_capacities = self.capacity_of_subnetwork(self.capacities, s)
+            sub_problem = RM_exact.Network_RM(sub_products, sub_resources, [sub_arrival_rates], sub_capacities,                                              self.total_time)
+            sub_value_funcs = sub_problem.value_func()
+            
+            for t in range(self.total_time):
+                feature_vectors = []
+                value_func = sub_value_funcs[t]
+                for state in range(sub_problem.n_states):
+                    state_remain_cap = RM_helper.remain_cap(sub_problem.n_states, sub_capacities, state)
+                    feature_vector = self.basis_func_vector(s, state_remain_cap)
+                    feature_vectors.append(feature_vector)
+                weights = self.solve_LLS_prob(feature_vectors, value_func)
+                self.approx_weights[t].append(weights[1])
+        return self.approx_weights
+            
+    def capacity_of_subnetwork(self, remain_cap, subnet_index):
+        """helper func: given a vector of remaining capacities of resources, returns a vector of capacity for the 
+        given subnetwork, which contains the capacities of resources in this subnetwork. """
+        resources_in_subnet = self.dl_resources[subnet_index]
+        subnet_resources = [self.resources[i] for i in resources_in_subnet]
+        subnet_remain_cap = [remain_cap[i] for i in resources_in_subnet]
+        return subnet_resources, subnet_remain_cap
+    
+    def basis_func_vector(self, subnet_index, subnet_capacities):
+        """helper func: given the index of a double-leg subnetwork, and capacities of resources in this subnetwork,
+        return a vector of features, i.e. return the terms in the basis function. """
+        subnet_products = self.dl_products[subnet_index]
+        subnet_resources = [self.resources[i] for i in self.dl_resources[subnet_index]]
+        subnet_incidence = RM_helper.calc_incidence_matrix(subnet_products, subnet_resources)
+        feature = [1]
+        
+        for i in range(len(subnet_products)):
+            incidence_vector = [row[i] for row in subnet_incidence]
+            min_resource_cap = min([subnet_capacities[i] for i, x in enumerate(incidence_vector) if x == 1])
+            feature.append(min_resource_cap)
+        
+        product = 1
+        for c in subnet_capacities:
+            feature.append(c ** 2)
+            product *= c
+            
+        feature.append(product)
+        
+#         print("feature=", feature)
+        return feature
+        
+    def solve_LLS_prob(self, feature_vectors, values):
+        """helper func: solve the linear least square problem, returns the optimal weights of basis functions. """
+        m = len(values)
+        n = len(feature_vectors[0])
+        B = [[0 * n] for _ in range(n)]
+        for feature_v in feature_vectors:
+            B += np.outer(feature_v, feature_v)
+            
+        try:
+            B_inverse = np.linalg.inv(B)
+        except np.linalg.linalg.LinAlgError as err:
+            if 'Singular matrix' in str(err):
+                return(False, [])
+            raise
+
+        C = [0] * (n)
+        for i in range(m):
+            prod = [values[i] * f_v for f_v in feature_vectors[i]]
+            C = [C[r] + prod[r] for r in range(n)]
+        coeff = B_inverse.dot(C)
+        return (True, coeff.tolist())
+        
+products = [['A-hub', 200, 0.1], ['A-hub-A', 300, 0.2], ['B-hub', 100, 0.14], ['B-hub-B', 600, 0.15],             ['A-hub-B', 80, 0.24], ['B-hub-A', 400, 0.12], 
+            ['C-hub-C', 543, 0.1]]
+resources = ['A-hub', 'B-hub', 'C-hub', 'hub-A', 'hub-B', 'hub-C']
+capacities = [3] * 6
+T = 3
+problem = DLBFA(products,resources, capacities, T)
+# problem.calc_value_func()
 
