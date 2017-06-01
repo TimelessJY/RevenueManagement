@@ -144,7 +144,7 @@ problem = Single_RM_static(products, demands, cap)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[46]:
+# In[13]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -179,9 +179,13 @@ class Single_RM_dynamic():
             size total_time * n_products
             (although it's always zero for all the products in the last time period, 
                 and for the last product in each time period)
+        bid_prices: 2D np array
+            contains the bid-price at each time period with different remaining capacity of the resource,
+            size total_time * (capacity + 1)
     """
     
     value_functions = []
+    bid_prices = []
     protection_levels = []
     
     def __init__(self, products, arrival_rates, capacity, total_time):
@@ -207,9 +211,11 @@ class Single_RM_dynamic():
                 raise ValueError('The products are not in the descending order of their revenues.')
         
     def calc_value_func(self):
-        """Calculate and return  the value functions of this problem."""
+        """Calculate the value functions of this problem backwards from the last time period to the beginning."""
         
         self.value_functions = [[0]*(self.capacity+1) for _ in range(self.total_time)] 
+        self.bid_prices = [[0] * (self.capacity + 1) for _ in range(self.total_time)]
+        
         for t in range(self.total_time - 1, -1, -1):
             if self.n_arrival_rates_periods > 1:
                 arrival_rates_t = self.arrival_rates[t]
@@ -228,26 +234,38 @@ class Single_RM_dynamic():
                     value += arrival_rates_t[j] * max(rev - delta_next_V, 0)
                 
                 self.value_functions[t][x] = round(value, 3)
+                self.bid_prices[t][x] = self.value_functions[t][x] - self.value_functions[t][x-1]
         return self.value_functions
     
-    def optimal_protection_levels(self):
-        """Calculate and return the optimal protection levels of this problem. """
+    def get_bid_prices(self):
+        if not self.value_functions:
+            self.calc_value_func()
         
+        return self.bid_prices
+    
+    def get_protection_levels(self):
+        """Calculate and return the time-dependent optimal protection levels of this problem. """
+        if not self.value_functions:
+            self.calc_value_func()
+            
         self.protection_levels = [[0]* self.n_products for _ in range(self.total_time)]
         
         for t in range(self.total_time - 1):
             for j in range(self.n_products - 1):
+                price = self.products[j+1][1]
                 for x in range(self.capacity, 0, -1):
                     delta_V = self.value_functions[t+1][x] - self.value_functions[t+1][x-1]
-                    if self.products[j+1][1] < delta_V:
+                    if price < delta_V:
                         self.protection_levels[t][j] = x
                         break
         return self.protection_levels
 
 products = [1, 30], [2, 25], [3, 12], [4, 4]
 arrival_rates = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
-# problem = Single_RM_dynamic(products, arrival_rates, 3, 3)
+problem = Single_RM_dynamic(products, arrival_rates, 3,3)
 # print(problem.calc_value_func())
+# problem.get_protection_levels()
+# problem.get_bid_prices()
 
 
 # In[47]:
