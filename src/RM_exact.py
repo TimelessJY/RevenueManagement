@@ -44,10 +44,11 @@ class Single_RM_static():
             contains value function, ranged over products and remaining capacity
             size n_products * (capacity + 1)
         protection_levels: 2D np array
-            contains the time-dependent optimal protection level for each class
+            contains the time-dependent optimal protection level for each class, from the highest fare to lowest
             size n_products
         bid_prices: 2D np array
-            contains the bid-price for each product with different remaining capacity of the resource
+            contains the bid-price for each product with different remaining capacity of the resource,
+            from the highest fare to lowest
             size (n_products - 1) * (capacity + 1)
     """
     

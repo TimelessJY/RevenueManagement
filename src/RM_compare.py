@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 import pandas
 import time
@@ -499,10 +499,10 @@ iteration = 100
 # plt.savefig('single_static_revs_diff')
 
 
-# In[36]:
+# In[18]:
 
-def simulate_single_static_bidprices_control(bid_prices, products, demands, capacity):
-    """Simulates bid-price control over the horizon T, on a single-static problem, with initial capacity given. 
+def simulate_single_static_bidprices_control(bid_prices, products, demands, capacity, requests = []):
+    """Simulates bid-price control, on a single-static problem, with initial capacity given. 
     ----------------------------
     Inputs:
         bid_prices: bid prices of methods to be simulated
@@ -510,10 +510,12 @@ def simulate_single_static_bidprices_control(bid_prices, products, demands, capa
                 (name, revenue)
         demands: mean and std of demand distribution for products, in the same order as the products are given
         capacity: initial capacity of the resource
+        requests: demand for each product, might not be given
     Returns: total revenue and load factor of each method. """
     
     n_methods = len(bid_prices)
-    requests = RM_helper.sample_single_static_demands(demands)
+    if not requests:
+        requests = RM_helper.sample_single_static_demands(demands)
     revs = [0] * n_methods # records the total revenue using bid prices produced by the two methods, i.e. bid_prices
     curr_cap = [capacity] * n_methods
 
@@ -532,19 +534,64 @@ def simulate_single_static_bidprices_control(bid_prices, products, demands, capa
                         break
         # for the highest fare class, accept all requests
         request = requests[0]
-        z = min(request, remain_cap)
+        z = min(request, curr_cap[m])
+
         curr_cap[m] -= z
         revs[m] += products[0][1] * z
     
-    result = [(revs[m], round(curr_cap[m] / capacity * 100,3)) for m in range(n_methods)]
+    result = [(revs[m], round((capacity - curr_cap[m]) / capacity * 100,3)) for m in range(n_methods)]
     return result
 
-pros = [[1,(17.3, 5.8), 1050], [2, (45.1, 15.0), 950], [3, (39.6, 13.2), 699], [4,(34.0, 11.3),520]]
+def simulate_single_static_protectionlevel_control(protection_levels, products, demands, capacity, requests = []):
+    """Simulates protection-level control, on a single-static problem, with initial capacity given. 
+    ----------------------------
+    Inputs:
+        protection_levels: protection levels of methods to be simulated
+        products: i.e. itineraries, assumed to be sorted in descending order of revenus, in the form of 
+                (name, revenue)
+        demands: mean and std of demand distribution for products, in the same order as the products are given
+        capacity: initial capacity of the resource
+        requests: demand for each product, might not be given
+    Returns: total revenue and load factor of each method. """
+    
+    n_methods = len(protection_levels)
+    if not requests:
+        requests = RM_helper.sample_single_static_demands(demands)
+    revs = [0] * n_methods # records the total revenue using bid prices produced by the two methods, i.e. bid_prices
+    curr_cap = [capacity] * n_methods
+
+    n_products = len(products)
+    for m in range(n_methods):
+        for fare_class in range(n_products - 1, 0, -1):
+            price = products[fare_class][1]
+            pl_j = protection_levels[m][fare_class - 1]
+            remain_cap = curr_cap[m]
+
+            decision = int(min(max(0, remain_cap - pl_j), requests[fare_class]))
+
+            curr_cap[m] -= decision
+            revs[m] += price * decision
+        # for the highest fare class, accept all requests
+        request = requests[0]
+        decision = min(request, curr_cap[m])
+
+        curr_cap[m] -= decision
+        revs[m] += products[0][1] * decision
+    
+    result = [(revs[m], round((capacity - curr_cap[m]) / capacity * 100,3)) for m in range(n_methods)]
+    return result
+
+pros = [[1, 1050,(17.3, 5.8)], [2, 950, (45.1, 15.0)], [3, 699, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
 cap = 80
-# products, demands, _ = RM_helper.sort_product_demands(pros)
-# exact = RM_exact.Single_RM_static(products, demands, cap)
+products, demands, _ = RM_helper.sort_product_demands(pros)
+exact = RM_exact.Single_RM_static(products, demands, cap)
 # exact_bid_prices = exact.get_bid_prices()
-# simulate_single_static_bidprices_control([exact_bid_prices], products, demands, cap)
+# print(simulate_single_static_bidprices_control([exact_bid_prices], products, demands, cap))
+
+# exact_pl = exact.get_protection_levels()
+# EMSR = RM_approx.Single_EMSR(products, demands, cap)
+# EMSR_pl = EMSR.get_protection_levels()
+# print(simulate_single_static_protectionlevel_control([exact_pl, EMSR_pl], products, demands, cap))
 
 
 # In[37]:
