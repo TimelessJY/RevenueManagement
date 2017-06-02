@@ -41,7 +41,7 @@ class Single_RM_static():
         To be calculated:
         ----------
         value_functions: 2D np array
-            contains value function, ranged over products and remaining capacity
+            contains value function, ranged over products(from highest fare, to lowest fare), and remaining capacity
             size n_products * (capacity + 1)
         protection_levels: 2D np array
             contains the time-dependent optimal protection level for each class, from the highest fare to lowest
@@ -144,7 +144,7 @@ problem = Single_RM_static(products, demands, cap)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[13]:
+# In[14]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -172,7 +172,7 @@ class Single_RM_dynamic():
         To be calculated:
         ----------
         value_functions: 2D np array
-            contains value function, ranged over time periods and remaining capacity
+            contains value function, ranged over time periods(from t=1, to t = T), and remaining capacity
             size total_time * (capacity + 1), i.e. T*(C+1)
         protection_levels: 2D np array
             contains the time-dependent optimal protection level for each class
@@ -268,7 +268,7 @@ problem = Single_RM_dynamic(products, arrival_rates, 3,3)
 # problem.get_bid_prices()
 
 
-# In[47]:
+# In[15]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -304,7 +304,7 @@ class Network_RM():
             indicates which product uses which resources, e.g. incidence_matrix[i][j] = 1 if product j uses resource i
             size n_resources * n_products
         value_functions: 2D np array
-            contains value function, ranged over time periods and remaining capacity
+            contains value function, ranged over time periods(from t=1, to t = T), and remaining capacity
             size total_time * n_states
     """
     
