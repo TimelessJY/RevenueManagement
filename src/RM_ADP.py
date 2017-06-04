@@ -369,7 +369,7 @@ problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[69]:
+# In[29]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -473,16 +473,27 @@ class ALP():
         return avail_prod
     
     def sample_visited_states(self, K):
-        """Step 1: simulate K times, get a bid-price control policy, then use it to simulate a control, 
-        and gather all visited states(in the form of remaining capacity of resources)"""
-        visited_states = []
+        """Step 1: simulate K visited states by obtaining a bid-price control policy, then using it to simulate a 
+        control, and gathering all visited states(in the form of remaining capacity of resources)"""
+        visited_states = [[] for _ in range(self.total_time)]
         curr_state = self.capacities[:]
-        visited_states.append(curr_state)
-        for i in range(K - 1):
-            bid_prices = self.solve_DLP(curr_state, i)
-            next_state = self.simulate_bid_prices_control(curr_state, bid_prices)
-            visited_states.append(next_state)
+        visited_states[0].append(curr_state)
+        total_num = 0
+        i = 1
+        while total_num < K:
+            time_period = i % self.total_time
+            if time_period == (self.total_time - 1):
+                # arrives at the last time period, finishes one time horizon
+                next_state = self.capacities[:]
+            else :
+                bid_prices = self.solve_DLP(curr_state, time_period)
+                next_state = self.simulate_bid_prices_control(curr_state, bid_prices)
+                if not next_state in visited_states[time_period + 1]:
+                    visited_states[time_period + 1].append(next_state)
+                    total_num += 1
+            
             curr_state = next_state
+            i += 1
         return visited_states
     
     def solve_RLP(self, sampled_states):
@@ -523,44 +534,46 @@ class ALP():
         # constraints 1, for each sampled state, TJ <= J
         constraints = []
         for t in range(len(sampled_states)):
-            s = sampled_states[t]
-            # calculate RHS, i.e. J(s), the state with current remaining capacity and at current time period
-            basis_func_s = self.generate_basis_func(s) # basis function
-            r_s_t = [[r[name] for name in n_i] for n_i in names[t]] # weights
-            RHS = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t)])
-            
-            # calculate LHS, i.e. TJ(s)
-            f_s = self.find_available_products(s) # products that can be sold, based on remaining capacities
-            LHS = 0
-    
-            if t < (self.total_time - 1):
-                r_s_t_next = [[r[name] for name in n_i] for n_i in names[t + 1]] # weights of next time periods
-                # value approximation of the state with the same remaining capacity in next time period
-                J_s = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t_next)])
-                total_arrival_rate = 0
-                
-                y_values_t = []
-                y_values_t.append(J_s)
-                
-                for f in f_s:
-                    arrival_rate = self.arrival_rates[f]
-                    total_arrival_rate += arrival_rate
-                    
-                    # approximates the value of the state in next time period, after selling product f
-                    A_f = [row[f] for row in self.incidence_matrix]
-                    s_f = [s_i - f_i for s_i, f_i in zip(s, A_f)]
-                    basis_func_s_f = self.generate_basis_func(s_f)
-                    J_s_f = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s_f, r_s_t_next)])
-                    LHS += arrival_rate * y[y_names[t]]
-                    y_values_t.append(self.products[f][1] + J_s_f)
-                    
-                LHS += (1- total_arrival_rate) * J_s
-                y_values.append(y_values_t)
-            else:
-                LHS = sum([self.arrival_rates[f] * self.products[f][1] for f in f_s])
+#             s = sampled_states[t]
+            states_t = sampled_states[t]
+            for s in states_t:
+                # calculate RHS, i.e. J(s), the state with current remaining capacity and at current time period
+                basis_func_s = self.generate_basis_func(s) # basis function
+                r_s_t = [[r[name] for name in n_i] for n_i in names[t]] # weights
+                RHS = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t)])
 
-            constraint = LHS <= RHS
-            RLP_model += constraint, "c" + str(t)
+                # calculate LHS, i.e. TJ(s)
+                f_s = self.find_available_products(s) # products that can be sold, based on remaining capacities
+                LHS = 0
+
+                if t < (self.total_time - 1):
+                    r_s_t_next = [[r[name] for name in n_i] for n_i in names[t + 1]] # weights of next time periods
+                    # value approximation of the state with the same remaining capacity in next time period
+                    J_s = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t_next)])
+                    total_arrival_rate = 0
+
+                    y_values_t = []
+                    y_values_t.append(J_s)
+
+                    for f in f_s:
+                        arrival_rate = self.arrival_rates[f]
+                        total_arrival_rate += arrival_rate
+
+                        # approximates the value of the state in next time period, after selling product f
+                        A_f = [row[f] for row in self.incidence_matrix]
+                        s_f = [s_i - f_i for s_i, f_i in zip(s, A_f)]
+                        basis_func_s_f = self.generate_basis_func(s_f)
+                        J_s_f = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s_f, r_s_t_next)])
+                        LHS += arrival_rate * y[y_names[t]]
+                        y_values_t.append(self.products[f][1] + J_s_f)
+
+                    LHS += (1- total_arrival_rate) * J_s
+                    y_values.append(y_values_t)
+                else:
+                    LHS = sum([self.arrival_rates[f] * self.products[f][1] for f in f_s])
+
+                constraint = LHS <= RHS
+                RLP_model += constraint
             
         # constraints 2, at each time period, for each resource, weights are in decreasing order
         for t in range(self.total_time):
@@ -616,10 +629,10 @@ capacities = [3,5]
 arrival_rate = [0.1, 0.2, 0.04,0.06, 0.01, 0.08, 0.23, 0.11, 0.14]
 # pros, demands, _ = RM_helper.sort_product_demands(p)
 # problem = ALP(pros, resources, [demands], capacities, 10, arrival_rate)
-# problem.get_bid_prices(10)
+# problem.get_bid_prices(50)
 
 
-# In[44]:
+# In[11]:
 
 #################################################
 ###### ADP: double-leg based decomposition ######
