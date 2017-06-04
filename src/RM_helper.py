@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[104]:
+# In[4]:
 
 import numpy as np
 import time
@@ -11,7 +11,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-# In[106]:
+# In[5]:
 
 def sort_product_demands(products):
     """
@@ -26,6 +26,14 @@ def sort_product_demands(products):
     demands_with_name = [[p[0], p[2]] for p in products]
     products = [[p[0], p[1]] for p in products]
     return (products, demands, demands_with_name)
+
+def sort_product_revenues(products):
+    """
+    sorts the given products of form:[product_name, revenue] according to the descending order of product revenues
+    """
+    n_products = len(products)
+    products.sort(key = lambda tup: tup[1], reverse=True)
+    return products
 
 def marginal_value_check(value_func):
     """checks whether the marginal values in computed value functions satisfy the proposition 2.21"""
@@ -171,60 +179,6 @@ def network_bid_prices(value_func, products, resources, capacities, incidence_ma
             bid_price_t.append([round(bp_r, 3) for bp_r in bp_t_s])
         bid_prices.append(bid_price_t)
     return bid_prices
-
-
-# In[110]:
-
-def extract_legs_info(products, resources):
-    """plots a graph of flights, produces the incidence matrix, and returns a complete list of flight itineraries."""
-    """input:
-       products: list of itineraries, in the form of [name, [(revenue, arrival_rate) for fare classes]]."""
-    graph = nx.DiGraph()
-    
-    # produces the full resources, by adding the opposite direction of each flight leg.
-    full_resources = resources[:]
-    for r in resources:
-        oppo_r = r.split('-')
-        full_resources.append(oppo_r[1] + '-' + oppo_r[0])
-    
-    n_products = len(products)
-    itinerary_fares = []
-    incidence_matrix = [[0] * n_products for _ in range(len(full_resources))] 
-    
-    for p in range(n_products):
-        itinerary = products[p]
-        nodes = itinerary[0].split('-')
-        for n in range(len(nodes) - 1):
-            leg_name = nodes[n] + '-' + nodes[n+1]
-            leg_index = full_resources.index(leg_name)
-            incidence_matrix[leg_index][p] = 1
-        
-        for f in range(len(itinerary[1])):
-            fare = itinerary[1][f]
-            fare_name = itinerary[0] + ',' + str(f + 1)
-            itinerary_fares.append([fare_name, fare[0], fare[1]])
-    
-    for leg in resources:
-        nodes = leg.split('-')
-        start = nodes[0]
-        end = nodes[1]
-        graph.add_node(start)
-        graph.add_node(end)
-        graph.add_edge(start, end)
-        graph.add_edge(end, start)
-        
-    plt.clf()
-    nx.draw_networkx(graph)
-    plt.savefig('flights-network.png')
-    graph_info = "airline network: n_nodes=" + str(len(graph.nodes())) + ", n_edges=" + str(len(graph.edges()))
-#     print(graph_info)
-    return incidence_matrix, itinerary_fares
-
-products = [['A-B', [(430, 0.21), (300, 0.29), (200, 0.43)]], ['A-E', [(220, 0), (150,0),(80,0.5)]],
-            ['A-E-B',[(420, 0.2), (290,0.3), (190, 0.4)]], ['B-A', [(430, 0.21), (300, 0.29), (200, 0.43)]], 
-           ['A-B-A', [(500, 0.2), (300, 0.19),(200, 0.5)]]]
-resources = ['A-E', 'A-B', 'E-B']
-extract_legs_info(products, resources)
 
 
 # In[ ]:

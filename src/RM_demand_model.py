@@ -7,7 +7,7 @@ import random
 import numpy as np
 
 
-# In[68]:
+# In[79]:
 
 class model():
     """Demand model for RM network problems, provides relative functionality.
@@ -44,6 +44,7 @@ class model():
         self.set_up_rates_levels()
         
     def extract_arrival_rates(self, arrival_rates):
+        """helper func: extract out arrival rates into three different levels. """
         self.arrival_rates['low'] = arrival_rates[0]
         
         if self.model_type == 2:
@@ -54,6 +55,7 @@ class model():
             self.arrival_rates['hi'] = arrival_rates[2]
             
     def set_up_rates_levels(self):
+        """helper func: decides the demand level at each time period, to be used over the whole process. """
         if self.model_type == 1:
             self.rates_levels = ['low'] * self.total_time
         else:
@@ -65,14 +67,30 @@ class model():
             if rand == 1:
                 new_level = 'hi'
             self.rates_levels += [new_level] * (self.total_time - self.change_time)      
+        print("levels = ", self.rates_levels)
         
-    def get_current_arrival_rates(self, t):
-        """ returns a list of arrival rates for products at the given time period"""
+    def current_arrival_rates(self, t):
+        """ returns a list of arrival rates for products at the given time period. """
         if t >= self.total_time:
             raise ValueError("Not valid time period.")
         return self.arrival_rates[self.rates_levels[t]]
-
+    
+    def current_mean_demands(self, curr_time):
+        """ returns the mean demands of products at the current time. """
+        sums = [0] * len(self.arrival_rates['low'])
+        for t in range(curr_time, self.total_time):
+            sums = [sum(x) for x in zip(sums, self.current_arrival_rates(t))]
+            
+        return sums
+        
 # rates = [[0.1, 0.2, 0.3],[0.4, 0.5, 0.6], [0.7, 0.8,0.9]]
 # dm = model(rates, 10, 2, 0.5)
-# dm.get_current_arrival_rates(1)
+# dm.current_arrival_rates(1)
+# dm.current_mean_demands(0)
+# dm.set_up_rates_levels()
+
+
+# In[ ]:
+
+
 

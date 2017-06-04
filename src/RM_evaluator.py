@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[9]:
+# In[16]:
 
 import itertools
 import random
@@ -10,6 +10,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.legend_handler import HandlerLine2D
+import networkx as nx
 
 import sys
 sys.path.append('.')
@@ -20,11 +21,12 @@ import RM_approx
 import RM_ADP
 
 
-# In[68]:
+# In[17]:
 
-PRICE_LIMITS = [150, 250]
+PRICE_LIMITS = [150, 250] # maximum prices for flight legs in a 3-spoke or 4-spoke network
+sum_arrival_rates = [0.3, 0.45, 0.9] # sum of arrival rates for low,med,hi demand levels
 
-def generate_network(n_spokes, demand_model):
+def generate_network(n_spokes, demand_model, fare_class = 1):
     """Generates a network using the given number of spokes, and the demand model, with random prices, and arrival rates
     of itineraries. Currently only supports 1 fare class per itinerary. """
     resources = [] # records flight legs names
@@ -58,15 +60,14 @@ def generate_network(n_spokes, demand_model):
     
     # aggregate all itineraries, and randomly generate the price and arrival rate
     itineraries += single_legs + double_legs + round_legs
-    f = len(itineraries)
-    demands = generate_random_arrival_rate(f, 0.3, demand_model)
+    f = len(itineraries) * fare_class
+    arrival_rates = generate_random_arrival_rate(f, demand_model)
     for i in range(f):
         full_iti = [itineraries[i]]
-        arrival_rate = demands[i]
         price = generate_random_price(itineraries[i])
-        full_iti.append([(price, arrival_rate)])
+        full_iti.append([price])
         itineraries[i] = full_iti
-    return resources, itineraries
+    return resources, itineraries, arrival_rates
     
 def reverse_itinerary(itinerary_names):
     """helper func: given a list of itinerary names, generate a list of reversed itineraries for them. """
@@ -78,20 +79,27 @@ def reverse_itinerary(itinerary_names):
         reversed_itineraries.append(reversed_name)
     return reversed_itineraries
 
-def generate_random_arrival_rate(n, total_sum, demand_model):
+def generate_random_arrival_rate(n, demand_model):
+    """helper func: depending on the demand model, returns a list of arrival rates for different demand levels. """
+    """only low demand level is returned if the demand model is 1."""
+    arrival_rates = [sample_random_probs(n, sum_arrival_rates[0])] # sampled arrival rates of low demand level
+    
+    if demand_model == 2:
+        med_level = sample_random_probs(n, sum_arrival_rates[1])
+        hi_level = sample_random_probs(n, sum_arrival_rates[2])
+        arrival_rates += [med_level, hi_level]
+    return arrival_rates
+        
+def sample_random_probs(n, total_sum):
     """helper func: generate n random values in [0,1] and normalize them so that their sum is equal to total_sum."""
-    if demand_model == 1:
-        # constant arrival rates for classes over time
-        M = sys.maxsize
-        x = random.sample(range(M), n - 1)
-        x.insert(0, 0)
-        x.append(M)
-        x.sort()
-        y = [x[i + 1] - x[i] for i in range(n)]
-        unit_simplex = [y_i / (1/total_sum * M) for y_i in y]
-        return unit_simplex
-    else:
-        print("TODO:implement model 2")
+    M = sys.maxsize
+    x = random.sample(range(M), n - 1)
+    x.insert(0, 0)
+    x.append(M)
+    x.sort()
+    y = [x[i + 1] - x[i] for i in range(n)]
+    unit_simplex = [y_i / (1/total_sum * M) for y_i in y]
+    return unit_simplex
 
 def generate_random_price(itinerary_name):
     """helper func: generate a random price for the given itinerary, limit depends on how many flight legs it uses."""
@@ -99,8 +107,51 @@ def generate_random_price(itinerary_name):
     price = random.randint(50, PRICE_LIMITS[leg_num-1])
     return price
 
-resources, itineraries = generate_network(3, 1)
-RM_helper.extract_legs_info(itineraries, resources)
+def extract_legs_info(products, resources):
+    """plots a graph of flights, produces the incidence matrix, and returns a complete list of flight itineraries."""
+    """input:
+       products: list of itineraries, in the form of [name, [(revenue, arrival_rate) for fare classes]]."""
+    graph = nx.DiGraph()
+    
+    # produces the full resources, by adding the opposite direction of each flight leg.
+    full_resources = resources[:]
+    for r in resources:
+        oppo_r = r.split('-')
+        full_resources.append(oppo_r[1] + '-' + oppo_r[0])
+    
+    n_products = len(products)
+    itinerary_fares = []
+    incidence_matrix = [[0] * n_products for _ in range(len(full_resources))] 
+    
+    for p in range(n_products):
+        itinerary = products[p]
+        nodes = itinerary[0].split('-')
+        for n in range(len(nodes) - 1):
+            leg_name = nodes[n] + '-' + nodes[n+1]
+            leg_index = full_resources.index(leg_name)
+            incidence_matrix[leg_index][p] = 1
+        
+        for f in range(len(itinerary[1])):
+            fare = itinerary[1][f]
+            fare_name = itinerary[0] + ',' + str(f + 1)
+            itinerary_fares.append([fare_name, fare])
+    
+    for leg in resources:
+        nodes = leg.split('-')
+        start = nodes[0]
+        end = nodes[1]
+        graph.add_node(start)
+        graph.add_node(end)
+        graph.add_edge(start, end)
+        graph.add_edge(end, start)
+        
+#     plt.clf()
+#     nx.draw_networkx(graph)
+#     plt.savefig('flights-network.png')
+    return incidence_matrix, itinerary_fares
+
+# resources, itineraries, arrival_rates = generate_network(3, 1)
+# extract_legs_info(itineraries, resources)
 
 
 # In[19]:

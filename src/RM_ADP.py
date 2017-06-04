@@ -13,6 +13,7 @@ import sys
 sys.path.append('.')
 import RM_helper
 import RM_exact
+import RM_demand_model
 
 import pulp
 
@@ -369,7 +370,7 @@ problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[29]:
+# In[6]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -382,19 +383,16 @@ class ALP():
     approximations = []
     default_method = "separable_affine"
     
-    def __init__(self, products, resources, demands, capacities, total_time, arrival_rates):
-        
+    def __init__(self, products, resources, capacities, total_time, demand_model):
         self.products = products
         self.resources = resources
-        self.demands = demands
         self.capacities = capacities
         self.total_time = total_time
         self.n_products = len(products)
         self.n_resources = len(resources)
-        self.n_demand_periods = len(demands)
         self.product_names = [p[0] for p in products]
         self.prices = dict(products)
-        self.arrival_rates = arrival_rates
+        self.demand_model = demand_model
         
         self.n_states = 1
         
@@ -424,10 +422,7 @@ class ALP():
             DLP_model += c, "c"+str(i)
             
         # constraints2, every booking limit should be less than the corresponding demand
-        if self.n_demand_periods > 1:
-            means = [d[0] for d in self.demands[curr_time]]
-        else:
-            means = [d[0] for d in self.demands[0]]
+        means = self.demand_model.current_mean_demands(curr_time)
         means_vector = dict(zip(self.product_names, means))
         for j in self.product_names:
             DLP_model += y[j] <= means_vector[j]
@@ -439,9 +434,9 @@ class ALP():
 #         print("bid-prices= ", bid_prices)
         return bid_prices
     
-    def simulate_bid_prices_control(self, initial_state, bid_prices):
+    def simulate_bid_prices_control(self, initial_state, bid_prices, t):
         """helper func: sample a single request, and use the given bid-prices to simulate the optimal control."""
-        sampled_request  = RM_helper.sample_network_demands(self.arrival_rates, 1)[0]
+        sampled_request = RM_helper.sample_network_demands(self.demand_model.current_arrival_rates(t), 1)[0]
         # simulate a 1-time-period bid-price control
         new_state = initial_state[:]
         if sampled_request < self.n_products:
@@ -485,9 +480,11 @@ class ALP():
             if time_period == (self.total_time - 1):
                 # arrives at the last time period, finishes one time horizon
                 next_state = self.capacities[:]
+                # resets the demand levels for the new iteration of the whole horizon
+                self.demand_model.set_up_rates_levels()
             else :
                 bid_prices = self.solve_DLP(curr_state, time_period)
-                next_state = self.simulate_bid_prices_control(curr_state, bid_prices)
+                next_state = self.simulate_bid_prices_control(curr_state, bid_prices, time_period)
                 if not next_state in visited_states[time_period + 1]:
                     visited_states[time_period + 1].append(next_state)
                     total_num += 1
@@ -533,8 +530,7 @@ class ALP():
         
         # constraints 1, for each sampled state, TJ <= J
         constraints = []
-        for t in range(len(sampled_states)):
-#             s = sampled_states[t]
+        for t in range(self.total_time):
             states_t = sampled_states[t]
             for s in states_t:
                 # calculate RHS, i.e. J(s), the state with current remaining capacity and at current time period
@@ -545,6 +541,8 @@ class ALP():
                 # calculate LHS, i.e. TJ(s)
                 f_s = self.find_available_products(s) # products that can be sold, based on remaining capacities
                 LHS = 0
+                
+                arrival_rates_t = self.demand_model.current_arrival_rates(t)
 
                 if t < (self.total_time - 1):
                     r_s_t_next = [[r[name] for name in n_i] for n_i in names[t + 1]] # weights of next time periods
@@ -554,10 +552,9 @@ class ALP():
 
                     y_values_t = []
                     y_values_t.append(J_s)
-
+                    
                     for f in f_s:
-                        arrival_rate = self.arrival_rates[f]
-                        total_arrival_rate += arrival_rate
+                        arrival_rate = arrival_rates_t[f]
 
                         # approximates the value of the state in next time period, after selling product f
                         A_f = [row[f] for row in self.incidence_matrix]
@@ -567,10 +564,10 @@ class ALP():
                         LHS += arrival_rate * y[y_names[t]]
                         y_values_t.append(self.products[f][1] + J_s_f)
 
-                    LHS += (1- total_arrival_rate) * J_s
+                    LHS += (1- sum(arrival_rates_t)) * J_s
                     y_values.append(y_values_t)
                 else:
-                    LHS = sum([self.arrival_rates[f] * self.products[f][1] for f in f_s])
+                    LHS = sum([arrival_rates_t[f] * self.products[f][1] for f in f_s])
 
                 constraint = LHS <= RHS
                 RLP_model += constraint
@@ -613,23 +610,23 @@ class ALP():
         return bid_prices
     
     def get_bid_prices(self, K):
-        """main func: given the number of states to be sampled, first simulate bid-price control policy to sample states, 
-        then solve the relaxed LP problem to get the bid-price control for actual sale season. 
+        """main func: given the number of states to be sampled, first simulate bid-price control policy to sample 
+        states, then solve the relaxed LP problem to get the bid-price control for actual sale season. 
         returns the bid prices generated. """
         sampled_states = self.sample_visited_states(K)
         varsdict, varsnames = self.solve_RLP(sampled_states)
         bid_prices_collected = self.collect_bid_prices(varsdict, varsnames)
         return bid_prices_collected
         
-p = [['1a', 1050, (17.3, 5.8)], ['2a',950, (45.1, 15.0)], ['3a', 699, (39.6, 13.2)], ['4a',520, (34.0, 11.3)],            ['1b', 501, (20, 3.5)], ['2b', 352, (63.1, 2.5)], ['3b', 722, (22.5, 6.1)], ['1ab', 760, (11.5, 2.1)],            ['2ab', 1400, (24.3, 6.4)]]
-
+p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
 resources = ['a', 'b']
 capacities = [3,5]
-
-arrival_rate = [0.1, 0.2, 0.04,0.06, 0.01, 0.08, 0.23, 0.11, 0.14]
-# pros, demands, _ = RM_helper.sort_product_demands(p)
-# problem = ALP(pros, resources, [demands], capacities, 10, arrival_rate)
-# problem.get_bid_prices(50)
+arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+# products = RM_helper.sort_product_revenues(p)
+# T = 10
+# dm = RM_demand_model.model(arrival_rates, T, 1)
+# problem = ALP(products, resources, capacities, T, dm)
+# problem.get_bid_prices(10)
 
 
 # In[11]:
