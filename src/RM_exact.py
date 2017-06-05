@@ -1,19 +1,19 @@
 
 # coding: utf-8
 
-# In[42]:
+# In[4]:
 
 import warnings
 import numpy as np
 from operator import itemgetter
 import scipy.stats
 import time
-from operator import itemgetter
 import itertools
 
 import sys
 sys.path.append('.')
 import RM_helper
+import RM_demand_model
 
 
 # In[45]:
@@ -268,7 +268,7 @@ problem = Single_RM_dynamic(products, arrival_rates, 3,3)
 # problem.get_bid_prices()
 
 
-# In[15]:
+# In[11]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -286,16 +286,14 @@ class Network_RM():
             size n_products * 2
         resources: np array
             contains names of resources, size n_resources
-        arrival_rates: 2D np array
-            contains probability of a demand for products in each period,
-            request for product j arrives in period t, if arrival_rates[t][j] = revenue_j > 0,
-            size total_time * n_products
         capacities: np array
             contains the capacity for each resource
             size n_resources
         total_time: integer
             the max time period T, time period t ranges from 1 to T
-        
+        demand_model: RM_demand_model.model
+            a model object that specifys the arrival rates of the products at each time period
+            
         To be calculated:
         ----------
         n_states: integer
@@ -312,29 +310,20 @@ class Network_RM():
     protection_levels = []
     incidence_matrix = []
     
-    def __init__(self, products, resources, arrival_rates, capacities, total_time):
+    def __init__(self, products, resources, capacities, total_time, demand_model):
         """Return a framework for a single-resource RM problem."""
         
         self.products = products
         self.resources = resources
-        self.arrival_rates = arrival_rates
         self.capacities = capacities
         self.total_time = total_time
         self.n_products = len(products)
         self.n_resources = len(resources)
-        self.n_arrival_rates_periods = len(arrival_rates)
+        self.demand_model = demand_model
         
-        # Check that the sequence of arrival_rates is specified for each time period
-        if self.n_arrival_rates_periods > 1 and (len(arrival_rates) != total_time or                                                  len(arrival_rates[0]) != self.n_products):
-            raise ValueError('Size of arrival_rates is not as expected.')
-            
         # Check that the capacity for each resource is given
         if len(capacities) != self.n_resources:
             raise ValueError('Number of capacities for resources is not correct.')
-        
-        # Important assumption: at most one demand will occur in each time period
-        if ((self.n_arrival_rates_periods == 1) and (sum(arrival_rates[0]) > 1))             or ((self.n_arrival_rates_periods > 1) and any(sum(arrival_rates[t]) > 1 for t in range(total_time))):
-                raise ValueError('There may be more than 1 demand arriving.')
         
         # Make sure the products are sorted in descending order based on their revenues
         for j in range(self.n_products-1):
@@ -365,9 +354,9 @@ class Network_RM():
         
         for j in range(self.n_products):
             incidence_vector = [row[j] for row in self.incidence_matrix]
-            reduced_cap = [x_i - a_j_i for x_i, a_j_i in zip(cap_vector, incidence_vector)]
+            reduced_cap = [x - a_j for x, a_j in zip(cap_vector, incidence_vector)]
             if all(c >= 0 for c in reduced_cap):
-                delta = 0
+                delta = 0 # opportunity cost
                 if t < self.total_time - 1:
                     reduced_state = RM_helper.state_index(self.n_states, self.capacities, reduced_cap)
                     delta = self.value_functions[t+1][state_num] - self.value_functions[t+1][reduced_state]
@@ -386,7 +375,7 @@ class Network_RM():
         if t < self.total_time - 1:
             curr_x = RM_helper.remain_cap(self.n_states, self.capacities, state_num)
             x_Au = [x_i - Au_i for x_i, Au_i in zip(curr_x, Au)]
-            state_x_Au = RM_helper.state_index(self.n_states, self.capacities,x_Au)
+            state_x_Au = RM_helper.state_index(self.n_states, self.capacities, x_Au)
             value += self.value_functions[t+1][state_x_Au]
         return value
    
@@ -394,15 +383,13 @@ class Network_RM():
         """Return the value functions of this problem, calculate it if necessary. """
         self.value_functions = [[0] * self.n_states for _ in range(self.total_time)] 
         for t in range(self.total_time - 1, -1, -1):
-            if self.n_arrival_rates_periods > 1:
-                arrival_rates_t = self.arrival_rates[t]
-            else:
-                arrival_rates_t = self.arrival_rates[0]
+            arrival_rates_t = self.demand_model.current_arrival_rates(t)
+            
             for x in range(self.n_states): 
                 value = 0
                 opt_control = self.optimal_control(x, t)
                 for j in range(self.n_products):
-                    arrival_rate = arrival_rates[j]
+                    arrival_rate = arrival_rates_t[j]
                     j_value = 0
                     if arrival_rate > 0:
                         u_j = opt_control[j]
@@ -418,7 +405,7 @@ class Network_RM():
                 
         return self.value_functions
     
-    def bid_prices(self):
+    def get_bid_prices(self):
         """return the bid prices for resources over all time periods and all remaining capacities situations."""
         if not self.value_functions:
             self.calc_value_func()
@@ -431,27 +418,16 @@ class Network_RM():
         
         return self.value_functions[0][-1]
 
-start_time = time.time()
-
-# ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601], ['b2', 0.12, 106],\
-#             ['bc', 0.03, 920],['c1', 0.07, 832],['d1', 0.14, 397], ['d2',  0.18, 533], ['ad', 0.09, 935], \
-#       ['ae', 0.013, 205],['f3', 0.004, 589], ['fb', 0.009, 422]]
-# products,demands, _ = RM_helper.sort_product_demands(ps)
-# resources = ['a', 'b', 'c', 'd', 'e', 'f']
-
-ps = [['a1', 200, 0.02], ['a2', 503, 0.06], ['ab1', 400, 0.08],['ab2', 704, 0.01], ['ab3', 601, 0.05],       ['ab4', 106, 0.12], ['bc', 920, 0.03],['c1', 832, 0.07]]
-resources = ['a', 'b', 'c']
-cap = [16] * 3
-T = 6
-
-products,arrival_rates, _ = RM_helper.sort_product_demands(ps)
-problem = Network_RM(products, resources, [arrival_rates], cap, T)
-
-# vf = problem.calc_value_func()
-# print(vf)
-# print(problem.total_expected_revenue())
-# print(problem.bid_prices())
-
+# start_time = time.time()
+# p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
+# resources = ['a', 'b']
+# capacities = [3,5]
+# arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+# products = RM_helper.sort_product_revenues(p)
+# T = 10
+# dm = RM_demand_model.model(arrival_rates, T, 1)
+# problem = Network_RM(products, resources, capacities, T, dm)
+# print(problem.get_bid_prices())
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 

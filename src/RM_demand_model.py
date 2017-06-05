@@ -7,7 +7,7 @@ import random
 import numpy as np
 
 
-# In[79]:
+# In[5]:
 
 class model():
     """Demand model for RM network problems, provides relative functionality.
@@ -40,6 +40,8 @@ class model():
         self.change_time = int(total_time / 2)
         self.p = p
         
+        if any(sum(rates) > 1 for rates in arrival_rates):
+            raise ValueError('Arrival rates sum over 1, there might be more than 1 command arriving.')
         self.extract_arrival_rates(arrival_rates)
         self.set_up_rates_levels()
         
