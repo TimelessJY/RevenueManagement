@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[4]:
+# In[2]:
 
 import warnings
 import numpy as np
@@ -16,7 +16,7 @@ import RM_helper
 import RM_demand_model
 
 
-# In[45]:
+# In[3]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -108,10 +108,11 @@ class Single_RM_static():
                         break
             self.protection_levels[-1] = self.capacity
             
+        return self.value_functions
 #         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity])
 #         print(self.value_functions)
 #         print(self.protection_levels)
-        
+
     def get_bid_prices(self):
         if not self.value_functions:
             self.calc_value_func()
@@ -268,7 +269,7 @@ problem = Single_RM_dynamic(products, arrival_rates, 3,3)
 # problem.get_bid_prices()
 
 
-# In[11]:
+# In[13]:
 
 ##############################
 ###### Network_RM DP ######### 

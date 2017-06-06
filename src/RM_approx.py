@@ -13,6 +13,7 @@ import sys
 sys.path.append('.')
 import RM_helper
 import RM_exact
+import RM_demand_model
 
 
 # In[14]:
@@ -305,7 +306,7 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[29]:
+# In[9]:
 
 ##############################
 ###### network_DAVN ##########
@@ -335,11 +336,13 @@ class Network_DAVN():
         To be calculated:
         ----------
         incidence_matrix: 2D np array
-            indicates which product uses which resources, e.g. incidence_matrix[i][j] = 1 if product j uses resource i
+            indicates which product uses which resources, 
+            e.g. incidence_matrix[i][j] = 1 if product j uses resource i
             size n_resources * n_products
         disp_adjusted_revs: 2D np array
             contains tuples for displacement-adjusted revenues, in the form of (name of product, value),
-            these are sorted from the highest value to the lowest, for each resource, size n_resources * n_products
+            these are sorted from the highest value to the lowest, for each resource, 
+            size n_resources * n_products
         virtual_classes: np array
             consists virtual classes for every resource, 
             each contains the names of products in that class, and the aggregated revenues of them
@@ -348,7 +351,8 @@ class Network_DAVN():
             consists of aggregated demands for products in each virtual class, for each resource
             size n_resources
         value_functions: 3D np array
-            contains the value functions, size n_resources * n_virtual_classes[for each resource] * (capacity_i + 1)
+            contains the value functions, 
+            size n_resources * n_virtual_classes[for each resource] * (capacity_i + 1)
         
     """
     incidence_matrix = []
@@ -356,6 +360,8 @@ class Network_DAVN():
     virtual_classes = []
     aggregated_demands = []
     value_functions = []
+    protection_levels = []
+    bid_prices = []
     
     def __init__(self, products, resources, demands, capacities, n_class):
         """Return a framework for a single-resource RM problem."""
@@ -400,12 +406,11 @@ class Network_DAVN():
         sum_static_bid_prices = [0] * self.n_products
 
         for j in range(self.n_products):
-            for i in range(self.n_resources):
-                if self.incidence_matrix[i][j] == 1:
-                    sum_static_bid_prices[j] += static_bid_prices[i]
+            incidence_v = [row[j] for row in self.incidence_matrix]
+            sum_static_bid_prices[j] = np.dot(incidence_v, static_bid_prices)
 
         ## Calculates the displacement-adjusted revenues, in sorted order
-        self.disp_adjusted_revs = [[('', 0)] * self.n_products for _ in range(self.n_resources)] 
+        self.disp_adjusted_revs = [[] for _ in range(self.n_resources)]
 
         for i in range(self.n_resources):
             for j in range(self.n_products):
@@ -413,7 +418,7 @@ class Network_DAVN():
                 disp_value = 0
                 if self.incidence_matrix[i][j] == 1: # only calculates for products that uses resource i
                     disp_value = float(self.products[j][1]) - sum_static_bid_prices[j] + static_bid_prices[i]
-                self.disp_adjusted_revs[i][j] = (product_name, disp_value)
+                    self.disp_adjusted_revs[i].append((product_name, disp_value))
                 
             self.disp_adjusted_revs[i].sort(key = lambda tup: tup[1], reverse=True)
     
@@ -444,7 +449,7 @@ class Network_DAVN():
         demands_times_disp_adjusted_rev = 0
         for j in range(l, k + 1):
             product_name = self.disp_adjusted_revs[i][j][0]
-            product_mean_demand = float(next((v[1][0] for v, v in enumerate(self.demands) if v[0] == product_name), 0))
+            product_mean_demand = float(next((v[1][0] for v, v in enumerate(self.demands) if v[0] ==                                               product_name), 0))
             sum_demands += product_mean_demand
             demands_times_disp_adjusted_rev += product_mean_demand * self.disp_adjusted_revs[i][j][1]
         if sum_demands == 0:
@@ -455,7 +460,7 @@ class Network_DAVN():
         sqrd_deriv_revenue = 0
         for j in range(l, k + 1):
             product_name = self.disp_adjusted_revs[i][j][0]
-            product_mean_demand = float(next((v[1][0] for v, v in enumerate(self.demands) if v[0] == product_name), 0))
+            product_mean_demand = float(next((v[1][0] for v, v in enumerate(self.demands) if v[0] ==                                               product_name), 0))
             sqrd_deriv_revenue += product_mean_demand * (self.disp_adjusted_revs[i][j][1] - m)**2
 
         return sqrd_deriv_revenue
@@ -463,18 +468,14 @@ class Network_DAVN():
     def clustering(self):
         """
         Partition products using each resource into a group of virtual classes.
-        This is done by dynamic programming, looking for the partitions that can give the minimum squared deriviation
-        of revenue (i.e. total within-group variation)
+        This is done by dynamic programming, looking for the partitions that can give the minimum squared 
+        deriviation of revenue (i.e. total within-group variation)
         ref: section 3.4.3, example 3.5
         """
         self.virtual_classes = [[] for _ in range(self.n_resources)]
         self.aggregated_demands = [[] for _ in range(self.n_resources)]
-        for i in range(self.n_resources):
-            # only partition products that uses this resource
-            n_available_products = self.n_products
-            available_products = [j for j, k in enumerate(self.disp_adjusted_revs[i]) if k[1] == 0]
-            if available_products:
-                n_available_products = available_products[0]
+        for i in range(self.n_resources):                
+            n_available_products = len(self.disp_adjusted_revs[i])
 
             virtual_classes_for_resource = []
             if n_available_products > 0:
@@ -487,8 +488,8 @@ class Network_DAVN():
 
     def calc_squared_deviation_matrix(self, resource_index, n_available_products):
         """
-        helper func: calculate the minimum squared deviation for the current resource, while trying partition products
-        into virtual classes. This is done by dynamic programming based indexing.
+        helper func: calculate the minimum squared deviation for the current resource, while trying partition 
+        products into virtual classes. This is done by dynamic programming based indexing.
         ref: section 3.4.3, example 3.5
         
         Parameter
@@ -592,7 +593,6 @@ class Network_DAVN():
         
         return (virtual_classes, demands)
     
-    
     def calc_value_function(self, static_price):
         """
         Main Function:
@@ -609,22 +609,26 @@ class Network_DAVN():
         
 #         print("received products, r, d = ", self.products, self.resources, self.demands)
         self.value_functions = []
+        self.protection_levels = []
+        self.bid_prices = []
         self.calc_displacement_adjusted_revenue(static_price)
         self.clustering()
         
         total_exp_rev = 0
         for i in range(self.n_resources):
-#             print("vc=",self.virtual_classes[i],", demand=",self.aggregated_demands[i], ", cap=", self.capacities[i])
+#             print("vc=",self.virtual_classes[i],", demand=",self.aggregated_demands[i], ", cap=", 
+#                   self.capacities[i])
             single_res_prob = RM_exact.Single_RM_static(self.virtual_classes[i], self.aggregated_demands[i], 
                                                  self.capacities[i])
-            value_func = single_res_prob.value_func()[0]
+            value_func = single_res_prob.calc_value_func()[0]
             self.value_functions.append(value_func)
-            total_exp_rev += value_func[len(self.virtual_classes[i]) - 1][self.capacities[i]]
-#         print("total_exp_rev = ", total_exp_rev)
-        return (self.value_functions, total_exp_rev)
-        
-products = [['1a', 1050], ['2a',950], ['3a', 699], ['4a',520],['1b', 501], ['2b', 352], ['3b', 722], ['1ab', 760],            ['2ab', 1400]]
-demands = [['1a', (17.3, 5.8)], ['2a', (45.1, 15.0)],['3a', (39.6, 13.2)],['4a', (34.0, 11.3)], ['1b', (20, 3.5)],            ['2b', (63.1, 2.5)], ['3b', (22.5, 6.1)], ['1ab', (11.5, 2.1)], ['2ab', (24.3, 6.4)]]
+            self.protection_levels.append(single_res_prob.get_protection_levels())
+            self.bid_prices.append(single_res_prob.get_bid_prices())
+        return (self.value_functions, self.protection_levels, self.bid_prices)
+    
+products = [['1a', 1050], ['2a',950], ['3a', 699], ['4a',520],['1b', 501], ['2b', 352], ['3b', 722],             ['1ab', 760], ['2ab', 1400]]
+demands = [['1a', (17.3, 5.8)], ['2a', (45.1, 15.0)],['3a', (39.6, 13.2)],['4a', (34.0, 11.3)], ['1b', (20, 3.5)],
+           ['2b', (63.1, 2.5)], ['3b', (22.5, 6.1)], ['1ab', (11.5, 2.1)], ['2ab', (24.3, 6.4)]]
 resources=['a', 'b']
 n_virtual_class = 2
 static_price = [0, 0]
@@ -634,6 +638,8 @@ capacities = [60, 60]
 # davn_prob = Network_DAVN(products, resources, demands, capacities,n_virtual_class)
 # vf = davn_prob.calc_value_function(static_price)
 # print(vf)
+# print(davn_prob.calc_displacement_adjusted_revenue(static_price))
+# print(davn_prob.disp_adjusted_revs)
 
 
 # In[35]:
@@ -719,16 +725,6 @@ def iterative_DAVN(products, resources, demands, n_virtual_class, capacities, re
 # capacities = [130,130]
 
 # iterative_DAVN(products, resources, demands, 1, capacities, capacities)
-
-
-# In[16]:
-
-
-
-
-# In[37]:
-
-
 
 
 # In[ ]:
