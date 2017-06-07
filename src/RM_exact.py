@@ -16,7 +16,7 @@ import RM_helper
 import RM_demand_model
 
 
-# In[3]:
+# In[10]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -131,6 +131,14 @@ class Single_RM_static():
             self.calc_value_func()
             
         return self.protection_levels
+    
+    def get_booking_limits(self):
+        if not self.protection_levels:
+            self.calc_value_func()
+            
+        booking_limits = [self.capacity] + [self.capacity - self.protection_levels[j-1] for j in range(1, self.n_products)]
+        
+        return booking_limits
 
 start_time = time.time()
 # Examples, ref: example 2.3, 2.4 in "The Theory and Practice of Revenue Management"
@@ -138,10 +146,11 @@ products = [[1, 1050], [2,567], [3, 534], [4,520]]
 # products = [[1, 1050], [2,950], [3, 699], [4,520]]
 demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 cap = 80
-problem = Single_RM_static(products, demands, cap)
+# problem = Single_RM_static(products, demands, cap)
 # problem.calc_value_func()
 # print(problem.get_protection_levels())
 # print(problem.get_bid_prices())
+# print(problem.get_booking_limits())
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
