@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[22]:
+# In[1]:
 
 import pandas
 import time
@@ -405,23 +405,22 @@ exact = RM_exact.Single_RM_static(products, demands, cap)
 # print(simulate_single_static_protectionlevel_control([exact_pl, EMSR_pl], products, demands, cap))
 
 
-# In[30]:
+# In[5]:
 
-def simulate_network_bidprices_control(bid_prices, products, arrival_rates, capacities, T):
+def simulate_network_bidprices_control(bid_prices, products, resources,  capacities, T, requests):
     """Simulates bid-price control over the horizon T, on a network problems, with initial capacity given. 
     ----------------------------
     Inputs:
         bid_prices: bid prices of methods to be simulated
-        products: i.e. itineraries, assumed to be sorted in descending order of revenus, in the form of 
-                (name, revenue)
-        arrival_rate: arrival rates of demands, in the same order as the products are given
+        products: i.e. itineraries, assumed to be sorted in descending order of revenus, in the form of (name, revenue)
+        resources: i.e. flight legs
         capacities: initial capacities of resources
         T: total time, i.e. sales horizon
+        requests: indicies of products that are requested during the actual sales
     Returns: total revenue and load factor of each method. """
     
     n_methods = len(bid_prices)
     incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
-    requests = RM_helper.sample_network_demands(arrival_rates, T)
     revs = [0] * n_methods # records the total revenue using bid prices produced by the two methods, i.e. bid_prices
     curr_caps = [capacities[:]] * n_methods
 
@@ -453,20 +452,6 @@ def simulate_network_bidprices_control(bid_prices, products, arrival_rates, capa
                     
     result = [(revs[i], round(sum(curr_caps[i]) / sum(capacities) * 100, 3)) for i in range(n_methods)]
     return result
-
-ps = [['a1', 200, 0.22], ['a2', 503, 0.06], ['ab1', 400, 0.18],['ab2', 704, 0.1], ['b1', 601, 0.05],       ['b2', 106, 0.12], ['bc', 920, 0.13],['c1', 832, 0.07]]
-resources = ['a', 'b', 'c']
-capacities = [3,3,3]
-total_time = 10
-# products, arrival_rates,_ = RM_helper.sort_product_demands_NEW(ps)
-# demands = [(a * total_time, 0) for a in arrival_rates]
-# problem = RM_ADP.ALP(products, resources, [demands], capacities, total_time,arrival_rates)
-# bid_prices = problem.get_bid_prices(10)
-# exact_method = RM_exact.Network_RM(products, resources, [arrival_rates], capacities, total_time)
-# exact_method.value_func()
-# exact_bid_prices = exact_method.bid_prices()
-
-# simulate_network_bidprices_control([bid_prices, exact_bid_prices], products, arrival_rates, capacities, total_time)
 
 
 # In[ ]:

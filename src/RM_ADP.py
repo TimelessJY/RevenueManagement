@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[3]:
+# In[33]:
 
 import numpy as np
 import scipy.stats
@@ -371,7 +371,7 @@ problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[6]:
+# In[34]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -380,20 +380,21 @@ problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
 class ALP():
     """ADP algorithm, using Linear Programming approach, DP model with feature-extraction method.
     ref: An Approximate Dynamic Programming Approach to Network Revenue Mangement. """
-    incidence_matrix = []
-    approximations = []
-    default_method = "separable_affine"
     
     def __init__(self, products, resources, capacities, total_time, demand_model):
-        self.products = products
-        self.resources = resources
-        self.capacities = capacities
+        self.products = products[:]
+        self.resources = resources[:]
+        self.capacities = capacities[:]
         self.total_time = total_time
         self.n_products = len(products)
         self.n_resources = len(resources)
         self.product_names = [p[0] for p in products]
         self.prices = dict(products)
         self.demand_model = demand_model
+        
+        self.incidence_matrix = []
+        self.approximations = []
+        self.default_method = "separable_affine"
         
         self.n_states = 1
         
@@ -442,8 +443,8 @@ class ALP():
         visited_states = [[] for _ in range(self.total_time)]
         curr_state = self.capacities[:]
         visited_states[0].append(curr_state)
-        total_num = 0
-        i = 1
+        total_num = 1
+        i = 0
         while total_num < K:
             time_period = i % self.total_time
             if time_period == (self.total_time - 1):
@@ -540,6 +541,7 @@ class ALP():
 
                 constraint = LHS <= RHS
                 RLP_model += constraint
+#         print("y_values:", y_values)
             
         # constraints 2, at each time period, for each resource, weights are in decreasing order
         for t in range(self.total_time):
@@ -550,8 +552,7 @@ class ALP():
                     RLP_model += constraint
                 
         # constraints 3, define the variables that helps eliminating the max() operations in constraints 1
-        for t in range(len(sampled_states)):
-            if t < self.total_time - 1:
+        for t in range(self.total_time - 1):
                 for y_v in y_values[t]:
                     RLP_model += y[y_names[t]] >= y_v
                 
@@ -582,19 +583,24 @@ class ALP():
         """main func: given the number of states to be sampled, first simulate bid-price control policy to sample 
         states, then solve the relaxed LP problem to get the bid-price control for actual sale season. 
         returns the bid prices generated. """
+        K = max(self.total_time, K)
         sampled_states = self.sample_visited_states(K)
         varsdict, varsnames = self.solve_RLP(sampled_states)
         bid_prices_collected = self.collect_bid_prices(varsdict, varsnames)
         return bid_prices_collected
-        
-# p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
-# resources = ['a', 'b']
-# capacities = [3,5]
-# arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
-# products = RM_helper.sort_product_revenues(p)
-# T = 10
+
+# products = [['A_hub_B,1', 247], ['A_hub_A,1', 236], ['B_hub_B,1', 214], ['C_hub_C,1', 179], ['B_hub_C,1', 176],\
+#             ['A_hub_B,1', 147], ['A_hub,1', 146], ['B_hub_C,1', 140], ['B_hub,1', 124], ['A_hub_C,1', 103], \
+#             ['C_hub,1', 101], ['B_hub,1', 83], ['A_hub,1', 70], ['C_hub,1', 70], ['A_hub_C,1', 50]]
+# resources  = ['A_hub', 'B_hub', 'C_hub']
+# caps =  [5, 5, 5]
+# T = 15
+# arrival_rates = [[0.00809336022330334, 0.01710070945009567, 0.020078326360033788, 0.05222523446258665, \
+#                  0.0022917983183347265, 0.05723402303384334, 0.03174537869736016, 0.013477754263534003, \
+#                  0.00797476109420122, 0.008106700861791355, 0.029476674866059958, 0.0017197658565915467, \
+#                  0.025068852291842095, 0.007361565392886562, 0.018045094827535572]]
 # dm = RM_demand_model.model(arrival_rates, T, 1)
-# problem = ALP(products, resources, capacities, T, dm)
+# problem = ALP(products, resources, caps, T, dm)
 # problem.get_bid_prices(10)
 
 

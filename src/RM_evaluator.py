@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[16]:
+# In[1]:
 
 import itertools
 import random
@@ -19,15 +19,17 @@ import RM_compare
 import RM_exact
 import RM_approx
 import RM_ADP
+import RM_demand_model
 
 
-# In[17]:
+# In[2]:
 
 PRICE_LIMITS = [150, 250] # maximum prices for flight legs in a 3-spoke or 4-spoke network
 sum_arrival_rates = [0.3, 0.45, 0.9] # sum of arrival rates for low,med,hi demand levels
+connect_symbol = '_'
 
-def generate_network(n_spokes, demand_model, fare_class = 1):
-    """Generates a network using the given number of spokes, and the demand model, with random prices, and arrival rates
+def generate_network(n_spokes, demand_type, fare_class = 1):
+    """Generates a network using the given number of spokes, and the demand type, with random prices, and arrival rates
     of itineraries. Currently only supports 1 fare class per itinerary. """
     resources = [] # records flight legs names
     itineraries = [] # records names and (revenue, arrival rate) pairs of fare classes of itineraries
@@ -38,7 +40,7 @@ def generate_network(n_spokes, demand_model, fare_class = 1):
     for i in range(n_spokes):
         spoke_name = chr(65 + i)
         spoke_names.append(spoke_name)
-        resources.append(spoke_name + '-' + hub_name)
+        resources.append(spoke_name + connect_symbol + hub_name)
     
     # produce single-leg itineraries
     single_legs = resources[:]
@@ -48,7 +50,7 @@ def generate_network(n_spokes, demand_model, fare_class = 1):
     double_legs = []
     two_spoke_pairs = list(itertools.combinations(''.join(spoke_names), 2))
     for pair in two_spoke_pairs:
-        iti = '-'.join([pair[0], hub_name, pair[1]])
+        iti = connect_symbol.join([pair[0], hub_name, pair[1]])
         double_legs.append(iti)
     
     double_legs += reverse_itinerary(double_legs)
@@ -56,12 +58,13 @@ def generate_network(n_spokes, demand_model, fare_class = 1):
     # produce double-leg itineraries, between the hub and the same spoke, i.e. round-trips between spoke and hub
     round_legs = []
     for spoke in spoke_names:
-        round_legs.append('-'.join([spoke, hub_name, spoke]))
+        round_legs.append(connect_symbol.join([spoke, hub_name, spoke]))
     
     # aggregate all itineraries, and randomly generate the price and arrival rate
     itineraries += single_legs + double_legs + round_legs
     f = len(itineraries) * fare_class
-    arrival_rates = generate_random_arrival_rate(f, demand_model)
+    arrival_rates = generate_random_arrival_rate(f, demand_type)
+    
     for i in range(f):
         full_iti = [itineraries[i]]
         price = generate_random_price(itineraries[i])
@@ -73,18 +76,18 @@ def reverse_itinerary(itinerary_names):
     """helper func: given a list of itinerary names, generate a list of reversed itineraries for them. """
     reversed_itineraries = []
     for itinerary in itinerary_names:
-        nodes = itinerary.split('-')
+        nodes = itinerary.split(connect_symbol)
         nodes.reverse()
-        reversed_name = '-'.join(nodes)
+        reversed_name = connect_symbol.join(nodes)
         reversed_itineraries.append(reversed_name)
     return reversed_itineraries
 
-def generate_random_arrival_rate(n, demand_model):
-    """helper func: depending on the demand model, returns a list of arrival rates for different demand levels. """
-    """only low demand level is returned if the demand model is 1."""
+def generate_random_arrival_rate(n, demand_type):
+    """helper func: depending on the demand type, returns a list of arrival rates for different demand levels. """
+    """only low demand level is returned if the demand type is 1."""
     arrival_rates = [sample_random_probs(n, sum_arrival_rates[0])] # sampled arrival rates of low demand level
     
-    if demand_model == 2:
+    if demand_type == 2:
         med_level = sample_random_probs(n, sum_arrival_rates[1])
         hi_level = sample_random_probs(n, sum_arrival_rates[2])
         arrival_rates += [med_level, hi_level]
@@ -103,7 +106,7 @@ def sample_random_probs(n, total_sum):
 
 def generate_random_price(itinerary_name):
     """helper func: generate a random price for the given itinerary, limit depends on how many flight legs it uses."""
-    leg_num = itinerary_name.count('-')
+    leg_num = itinerary_name.count(connect_symbol)
     price = random.randint(50, PRICE_LIMITS[leg_num-1])
     return price
 
@@ -116,20 +119,18 @@ def extract_legs_info(products, resources):
     # produces the full resources, by adding the opposite direction of each flight leg.
     full_resources = resources[:]
     for r in resources:
-        oppo_r = r.split('-')
-        full_resources.append(oppo_r[1] + '-' + oppo_r[0])
+        oppo_r = r.split(connect_symbol)
+        full_resources.append(oppo_r[1] + connect_symbol + oppo_r[0])
     
     n_products = len(products)
     itinerary_fares = []
-    incidence_matrix = [[0] * n_products for _ in range(len(full_resources))] 
     
     for p in range(n_products):
         itinerary = products[p]
-        nodes = itinerary[0].split('-')
+        nodes = itinerary[0].split(connect_symbol)
         for n in range(len(nodes) - 1):
-            leg_name = nodes[n] + '-' + nodes[n+1]
+            leg_name = nodes[n] + connect_symbol + nodes[n+1]
             leg_index = full_resources.index(leg_name)
-            incidence_matrix[leg_index][p] = 1
         
         for f in range(len(itinerary[1])):
             fare = itinerary[1][f]
@@ -137,7 +138,7 @@ def extract_legs_info(products, resources):
             itinerary_fares.append([fare_name, fare])
     
     for leg in resources:
-        nodes = leg.split('-')
+        nodes = leg.split(connect_symbol)
         start = nodes[0]
         end = nodes[1]
         graph.add_node(start)
@@ -148,13 +149,14 @@ def extract_legs_info(products, resources):
 #     plt.clf()
 #     nx.draw_networkx(graph)
 #     plt.savefig('flights-network.png')
-    return incidence_matrix, itinerary_fares
+    products = RM_helper.sort_product_revenues(itinerary_fares)
+    return products
 
 # resources, itineraries, arrival_rates = generate_network(3, 1)
 # extract_legs_info(itineraries, resources)
 
 
-# In[19]:
+# In[3]:
 
 def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
     """Compare the EMSR-b method, with single-static DP model."""
@@ -248,11 +250,72 @@ iteration = 100
 
 
 
+# In[6]:
+
+p = 0.5
+def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
+    """ generate a collection of random problems to be used in evaluation,
+    each specifying products, resources, capacities of resources, total time, demand model"""
+    problem_sets = []
+    for i in range(total_num):
+        resources, itineraries, arrival_rates = generate_network(n_spoke, demand_type, n_fare_class)
+        products = extract_legs_info(itineraries, resources)
+        capacities = [cap] * len(resources)
+        total_time = cap * 3
+        dm = None
+        dm = RM_demand_model.model(arrival_rates, total_time, demand_type, p)
+        
+        problem = [products, resources, capacities, total_time, dm]
+        problem_sets.append(problem)
+        
+    return problem_sets
+    
+def compare_with_DP(n_spoke, cap, iterations, n_virtual_class, K):
+    """ small network problems, solved by DP, DLPDAVN, and ADP respectively """
+    col_titles = ["rev_DLPDAVN_mean %",  "rev_LPADP_mean %", ]
+    table_data = []
+    problems = generate_samples(10, n_spoke, cap, 1, 1)
+    for prob in problems:
+        diff_DLPDAVN = []
+        diff_LPADP = []
+        
+        products = prob[0]
+        resources = prob[1]
+        capacities = prob[2]
+        total_time = prob[3]
+        demand_model = prob[4]
+        a = demand_model.arrival_rates['low']
+        
+        exactDP_model = RM_exact.Network_RM(products, resources, capacities, total_time, demand_model)
+        DLPDAVN_model = RM_approx.DLP_DAVN(products, resources, capacities, total_time, n_virtual_class, demand_model)
+        LPADP_model = RM_ADP.ALP(products, resources, capacities, total_time, demand_model)
+        
+        exactDP_bid_prices = exactDP_model.get_bid_prices()
+        LPADP_bid_prices = LPADP_model.get_bid_prices(K)
+        
+        bid_prices = [exactDP_bid_prices, LPADP_bid_prices]
+        
+        for i in range(iterations):
+            requests = demand_model.sample_network_arrival_rates()
+            
+            eval_results = RM_compare.simulate_network_bidprices_control(bid_prices, products, resources, capacities,                                                                         total_time, requests)
+#             print("eval_results: ", eval_results)
+            exactDP_rev = eval_results[0][0]
+            LPADP_rev = eval_results[0][0]
+            DLPDAVN_rev = DLPDAVN_model.performance(requests)[0]
+            
+            diff_LPADP.append((exactDP_rev - LPADP_rev)/exactDP_rev)
+            diff_DLPDAVN.append((exactDP_rev - DLPDAVN_rev)/exactDP_rev)
+            
+        table_data.append([np.mean(diff_LPADP) * 100, np.mean(diff_DLPDAVN) * 100])
+            
+    print(pandas.DataFrame(table_data, range(len(problems)), col_titles))
+    return table_data
+    
+# compare_with_DP(3, 5, 3, 3, 10)
+
+
 # In[ ]:
 
-def compare_ADP_LP_w_DLP(T_lb, T_ub, T_interval):
-    # 3 spoke situation 
-    
-    
-    
+
 

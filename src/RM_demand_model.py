@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[24]:
+# In[38]:
 
 import random
 import numpy as np
@@ -10,9 +10,9 @@ from scipy.stats import binom
 import math
 
 
-# In[29]:
+# In[42]:
 
-class model():
+class model:
     """Demand model for RM network problems, provides relative functionality.
             
     Given:
@@ -29,15 +29,14 @@ class model():
         in model 2, the probability that the rates level after half time changes to high, (1-p) for changing to low.
     """
     
-    arrival_rates = {}
-    rates_levels = []
-    
-    def __init__(self, arrival_rates, total_time, model_type, p=0):
+    def __init__(self, arrival_rates, total_time, model_type, p=0.5):
         if model_type > 2:
             raise ValueError('Unrecognized demand model.')
         if not arrival_rates:
             raise ValueError('No arrival rates data given.')
             
+        self.arrival_rates = {}
+        self.rates_levels = []
         self.model_type = model_type
         self.total_time = total_time
         self.change_time = int(total_time / 2)
@@ -47,18 +46,18 @@ class model():
             raise ValueError('Arrival rates sum over 1, there might be more than 1 command arriving.')
         self.extract_arrival_rates(arrival_rates)
         self.set_up_rates_levels()
-        
+                
     def extract_arrival_rates(self, arrival_rates):
         """helper func: extract out arrival rates into three different levels. """
-        self.arrival_rates['low'] = arrival_rates[0]
+        self.arrival_rates['low'] = arrival_rates[0][:]
         self.n_rates = len(arrival_rates[0])
         
         if self.model_type == 2:
             if len(arrival_rates) < 3:
                 raise ValueError('Missing arrival rates data for the chosen model type.')
                 
-            self.arrival_rates['med'] = arrival_rates[1]
-            self.arrival_rates['hi'] = arrival_rates[2]
+            self.arrival_rates['med'] = arrival_rates[1][:]
+            self.arrival_rates['hi'] = arrival_rates[2][:]
             
     def set_up_rates_levels(self):
         """helper func: decides the demand level at each time period, to be used over the whole process. """

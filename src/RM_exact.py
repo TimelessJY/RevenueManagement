@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[12]:
 
 import warnings
 import numpy as np
@@ -16,7 +16,7 @@ import RM_helper
 import RM_demand_model
 
 
-# In[10]:
+# In[13]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -52,9 +52,6 @@ class Single_RM_static():
             size (n_products - 1) * (capacity + 1)
     """
     
-    value_functions = []
-    protection_levels = []
-    bid_prices = []
     
     def __init__(self, products, demands, capacity):
         """Return a framework for a single-resource RM problem."""
@@ -63,6 +60,9 @@ class Single_RM_static():
         self.capacity = capacity
         self.n_products = len(products)
         
+        self.value_functions = []
+        self.protection_levels = []
+        self.bid_prices = []
         # Check that the data of demands is specified for each product
         if len(demands) != self.n_products:
             raise ValueError('Size of demands is not as expected.')
@@ -154,7 +154,7 @@ cap = 80
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[14]:
+# In[15]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -194,10 +194,6 @@ class Single_RM_dynamic():
             size total_time * (capacity + 1)
     """
     
-    value_functions = []
-    bid_prices = []
-    protection_levels = []
-    
     def __init__(self, products, arrival_rates, capacity, total_time):
         """Return a framework for a single-resource RM problem."""
         self.products = products
@@ -206,6 +202,10 @@ class Single_RM_dynamic():
         self.total_time = total_time
         self.n_products = len(products)
         self.n_arrival_rates_periods = len(arrival_rates)
+        
+        self.value_functions = []
+        self.bid_prices = []
+        self.protection_levels = []
         
         # Check that the sequence of arrival_rates is specified for each time period
         if self.n_arrival_rates_periods > 1 and (len(arrival_rates) != total_time or                                                  len(arrival_rates[0]) != self.n_products):
@@ -278,7 +278,7 @@ problem = Single_RM_dynamic(products, arrival_rates, 3,3)
 # problem.get_bid_prices()
 
 
-# In[13]:
+# In[16]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -316,10 +316,6 @@ class Network_RM():
             size total_time * n_states
     """
     
-    value_functions = []
-    protection_levels = []
-    incidence_matrix = []
-    
     def __init__(self, products, resources, capacities, total_time, demand_model):
         """Return a framework for a single-resource RM problem."""
         
@@ -330,6 +326,10 @@ class Network_RM():
         self.n_products = len(products)
         self.n_resources = len(resources)
         self.demand_model = demand_model
+        
+        self.value_functions = []
+        self.protection_levels = []
+        self.incidence_matrix = []
         
         # Check that the capacity for each resource is given
         if len(capacities) != self.n_resources:
