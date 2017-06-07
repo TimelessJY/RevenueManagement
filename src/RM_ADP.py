@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[3]:
 
 import numpy as np
 import scipy.stats
@@ -14,6 +14,7 @@ sys.path.append('.')
 import RM_helper
 import RM_exact
 import RM_demand_model
+import RM_approx
 
 import pulp
 
@@ -400,40 +401,8 @@ class ALP():
             self.n_states *= (c+1)
             
         self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
-
-    def solve_DLP(self, remain_cap, curr_time):
-        """in step 1: solves a DLP model, with the given remaining capacity, and the current time period; returns bid
-        prices for resources. """
-        DLP_model = pulp.LpProblem('DLP model', pulp.LpMaximize)
-        y = pulp.LpVariable.dict('y_%s', self.product_names, lowBound= 0)
+        self.DLP_model = RM_approx.DLP(products, resources, capacities, demand_model)
         
-        # objective function
-        DLP_model += sum([self.prices[j] * y[j] for j in self.product_names])
-        
-        # constraints 1, for each resource, the sum of products of consumption py each product and the booking limit of 
-        # that product is less than the total capacity of that resource
-        constraints = []
-        for i in range(self.n_resources):
-            incidence = self.incidence_matrix[i]
-            incidence_vector = dict(zip(self.product_names, incidence))
-            cap = remain_cap[i]
-            c = sum([incidence_vector[i] * y[i] for i in self.product_names]) <= cap
-            constraints.append(c)
-            DLP_model += c, "c"+str(i)
-            
-        # constraints2, every booking limit should be less than the corresponding demand
-        means = self.demand_model.current_mean_demands(curr_time)
-        means_vector = dict(zip(self.product_names, means))
-        for j in self.product_names:
-            DLP_model += y[j] <= means_vector[j]
-                  
-        DLP_model.solve()
-#         print(DLP_model)
-        
-        bid_prices = [c.pi for c in constraints]
-#         print("bid-prices= ", bid_prices)
-        return bid_prices
-    
     def simulate_bid_prices_control(self, initial_state, bid_prices, t):
         """helper func: sample a single request, and use the given bid-prices to simulate the optimal control."""
         sampled_request = RM_helper.sample_network_demands(self.demand_model.current_arrival_rates(t), 1)[0]
@@ -483,7 +452,7 @@ class ALP():
                 # resets the demand levels for the new iteration of the whole horizon
                 self.demand_model.set_up_rates_levels()
             else :
-                bid_prices = self.solve_DLP(curr_state, time_period)
+                bid_prices = self.DLP_model.get_bid_prices(curr_state, time_period)
                 next_state = self.simulate_bid_prices_control(curr_state, bid_prices, time_period)
                 if not next_state in visited_states[time_period + 1]:
                     visited_states[time_period + 1].append(next_state)
@@ -618,10 +587,10 @@ class ALP():
         bid_prices_collected = self.collect_bid_prices(varsdict, varsnames)
         return bid_prices_collected
         
-p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
-resources = ['a', 'b']
-capacities = [3,5]
-arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+# p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
+# resources = ['a', 'b']
+# capacities = [3,5]
+# arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
 # products = RM_helper.sort_product_revenues(p)
 # T = 10
 # dm = RM_demand_model.model(arrival_rates, T, 1)
@@ -629,7 +598,7 @@ arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
 # problem.get_bid_prices(10)
 
 
-# In[11]:
+# In[4]:
 
 #################################################
 ###### ADP: double-leg based decomposition ######
