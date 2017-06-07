@@ -650,28 +650,23 @@ T = 100
 # print(davn_prob.disp_adjusted_revs)
 
 
-# In[12]:
+# In[31]:
 
 ##############################
 ###### DLP approach   ########
 ##############################
 class DLP():
     def __init__(self, products, resources, capacities, demand_model):
-            self.products = products
-            self.resources = resources
-            self.capacities = capacities
-            self.n_products = len(products)
-            self.n_resources = len(resources)
-            self.product_names = [p[0] for p in products]
-            self.prices = dict(products)
-            self.demand_model = demand_model
+        self.products = products
+        self.resources = resources
+        self.capacities = capacities
+        self.n_products = len(products)
+        self.n_resources = len(resources)
+        self.product_names = [p[0] for p in products]
+        self.prices = dict(products)
+        self.demand_model = demand_model
 
-            self.n_states = 1
-
-            for c in self.capacities:
-                self.n_states *= (c+1)
-
-            self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
+        self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
 
     def get_bid_prices(self, remain_cap, curr_time):
         """Solves a DLP model, with the given remaining capacity, and the current time period; returns bid
@@ -713,11 +708,11 @@ class DLP():
 # products = RM_helper.sort_product_revenues(p)
 # T = 10
 # dm = RM_demand_model.model(arrival_rates, T, 1)
-# problem = DLP(products, resources, capacities, T, dm)
+# problem = DLP(products, resources, capacities, dm)
 # problem.get_bid_prices([1,2], 3)
 
 
-# In[20]:
+# In[30]:
 
 ##############################
 ###### DLP with DAVN  ########
@@ -774,14 +769,14 @@ def DLP_DAVN(products, resources, capacities, total_time, n_virtual_class, deman
     load_factor = (1 - np.mean(consumed)) * 100
     return total_revs, load_factor
         
-p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
-resources = ['a', 'b']
-capacities = [3,5]
-arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
-products = RM_helper.sort_product_revenues(p)
-T = 10
-dm = RM_demand_model.model(arrival_rates, T, 1)
-DLP_DAVN(products, resources, capacities, T, 2, dm)
+# p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
+# resources = ['a', 'b']
+# capacities = [3,5]
+# arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+# products = RM_helper.sort_product_revenues(p)
+# T = 10
+# dm = RM_demand_model.model(arrival_rates, T, 1)
+# DLP_DAVN(products, resources, capacities, T, 2, dm)
 
 
 # In[35]:
