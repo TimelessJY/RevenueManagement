@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from matplotlib.legend_handler import HandlerLine2D
 
 
-# In[31]:
+# In[2]:
 
 def compare_iDAVN_singleDPstatic(products, resources, n_class, cap_lb, cap_ub, cap_interval):
     """Compare the iterative DAVN method, with a collection of single-resource static DP model."""
@@ -111,7 +111,7 @@ resources = ['a', 'b']
 # plt.savefig('DAVN-ssDP-diff')
 
 
-# In[24]:
+# In[3]:
 
 # Draw the graph of running time of the network_DP model
 def eval_networkDP_changingCap(products, resources, cap_lb, cap_ub, total_time):
@@ -191,7 +191,7 @@ def eval_networkDP_changingCap(products, resources, cap_lb, cap_ub, total_time):
 # plt.savefig('network-DP-time-6')
 
 
-# In[25]:
+# In[4]:
 
 def evaluate_network_control(products, resources, demands, capacities, approxed_bid_prices, total_time, iterations):
     """using the given bid-prices of a heuristic/approximation to evaluate the difference between revenues gained 
@@ -250,7 +250,7 @@ def decide_to_sell(incidence_vector, remained_cap, resource_bid_prices, profit, 
     return all(x_i <= c_i for x_i, c_i in zip(incidence_vector, remained_cap)) and profit >= opportunity_cost
 
 
-# In[26]:
+# In[5]:
 
 def eval_ADP_DPf(pros, resources, capacities, total_time, iterations):
     """Compare the ADP algorithm using DP model with feature extraction, with exact DP model of network problems."""
@@ -310,7 +310,7 @@ def visualize_perf_ADP_DPf(products, resources, T_lb, T_ub, T_interval, cap_lb, 
 # plt.savefig('ADP_DPf_networkDP-rev-diff')
 
 
-# In[29]:
+# In[6]:
 
 def simulate_single_static_bidprices_control(bid_prices, products, demands, capacity, requests = []):
     """Simulates bid-price control, on a single-static problem, with initial capacity given. 
@@ -405,7 +405,7 @@ exact = RM_exact.Single_RM_static(products, demands, cap)
 # print(simulate_single_static_protectionlevel_control([exact_pl, EMSR_pl], products, demands, cap))
 
 
-# In[5]:
+# In[11]:
 
 def simulate_network_bidprices_control(bid_prices, products, resources,  capacities, T, requests):
     """Simulates bid-price control over the horizon T, on a network problems, with initial capacity given. 
@@ -450,7 +450,7 @@ def simulate_network_bidprices_control(bid_prices, products, resources,  capacit
                     revs[i] += profit
                     curr_caps[i] = remain_cap[:]
                     
-    result = [(revs[i], round(sum(curr_caps[i]) / sum(capacities) * 100, 3)) for i in range(n_methods)]
+    result = [(revs[i], (1 - np.mean([r / c for r, c in zip(curr_caps[i], capacities)])) * 100)                for i in range(n_methods)]
     return result
 
 

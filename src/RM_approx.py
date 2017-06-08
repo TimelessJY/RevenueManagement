@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[39]:
+# In[4]:
 
 import warnings
 import numpy as np
@@ -17,7 +17,7 @@ import RM_demand_model
 import pulp
 
 
-# In[43]:
+# In[31]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -67,7 +67,7 @@ class Single_EMSR():
         
         # Make sure the products are sorted in descending order based on their revenues
         for j in range(self.n_products-1):
-            if products[j][1] < products[j+1][1]:
+            if self.products[j][1] < self.products[j+1][1]:
                 raise ValueError('The products are not in the descending order of their revenues.')
             
     def weighted_average_revenue(self, j):
@@ -99,16 +99,16 @@ class Single_EMSR():
         return self.protection_levels
 
 start_time = time.time()
-products = [[1, 1050], [2,567], [3, 534], [4,520]]
-# products = [[1, 1050], [2,950], [3, 699], [4,520]]
-demands = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
-# problem = Single_EMSR(products, demands, 80)
+p = [[1, 1050], [2,567], [3, 534], [4,520]]
+# p = [[1, 1050], [2,950], [3, 699], [4,520]]
+d = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
+# problem = Single_EMSR(p, d, 80)
 # print(problem.get_protection_levels())
 
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[2]:
+# In[6]:
 
 ##############################
 ###### Single_DCM ############
@@ -307,7 +307,7 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[44]:
+# In[34]:
 
 ##############################
 ###### network_DAVN ##########
@@ -636,28 +636,29 @@ class Network_DAVN():
             self.bid_prices.append(single_res_prob.get_bid_prices())
         return (self.value_functions, self.booking_limits, self.bid_prices, self.index_scheme)
     
-products = [['1a', 1050], ['2a',950], ['3a', 699], ['4a',520],['1b', 501], ['2b', 352], ['3b', 722],             ['1ab', 760], ['2ab', 1400]]
-resources=['a', 'b']
-n_virtual_class = 2
-static_price = [0, 0]
-capacities = [60, 60]
-arrival_rates = [[0.1, 0.2, 0.05, 0.08, 0.14, 0.21, 0.02, 0.03, 0.04]]
-products = RM_helper.sort_product_revenues(products)
-T = 100
-# dm = RM_demand_model.model(arrival_rates, T, 1)
-# davn_prob = Network_DAVN(products, resources, capacities,n_virtual_class, dm)
-# vf = davn_prob.calc_value_function(static_price, [60, 60], 0)
-# print(vf)
-# print(davn_prob.calc_displacement_adjusted_revenue(static_price))
-# print(davn_prob.disp_adjusted_revs)
+# p = [['1a', 1050], ['2a',950], ['3a', 699], ['4a',520],['1b', 501], ['2b', 352], ['3b', 722], \
+#             ['1ab', 760], ['2ab', 1400]]
+# r=['a', 'b']
+# nvc = 2
+# sp = [0, 0]
+# c = [60, 60]
+# ar = [[0.1, 0.2, 0.05, 0.08, 0.14, 0.21, 0.02, 0.03, 0.04]]
+# ps = RM_helper.sort_product_revenues(p)
+# T = 100
+# dm = RM_demand_model.model(ar, T, 1)
+# davn_prob = Network_DAVN(ps, r, c, nvc, dm)
+# vf = davn_prob.calc_value_function(sp, [60, 60], 0)
+# # print(vf)
+# # print(davn_prob.calc_displacement_adjusted_revenue(sp))
+# # print(davn_prob.disp_adjusted_revs)
 
 
-# In[45]:
+# In[51]:
 
 ##############################
-###### DLP approach   ########
+###### Network_DLP approach   ########
 ##############################
-class DLP():
+class Network_DLP():
     def __init__(self, products, resources, capacities, demand_model):
         self.products = products
         self.resources = resources
@@ -667,13 +668,16 @@ class DLP():
         self.product_names = [p[0] for p in products]
         self.prices = dict(products)
         self.demand_model = demand_model
+        
+        self.objective_value = 0
+        self.bid_prices = []
 
         self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
 
     def get_bid_prices(self, remain_cap, curr_time):
-        """Solves a DLP model, with the given remaining capacity, and the current time period; returns bid
+        """Solves a Network_DLP model, with the given remaining capacity, and the current time period; returns bid
         prices for resources. """
-        DLP_model = pulp.LpProblem('DLP model', pulp.LpMaximize)
+        DLP_model = pulp.LpProblem('Network_DLP model', pulp.LpMaximize)
         y = pulp.LpVariable.dict('y_%s', self.product_names, lowBound= 0)
         
         # objective function
@@ -699,28 +703,34 @@ class DLP():
         DLP_model.solve()
 #         print(DLP_model)
         
-        bid_prices = [c.pi for c in constraints]
-#         print("bid-prices= ", bid_prices)
-        return bid_prices
-
+        self.bid_prices = [c.pi for c in constraints]
+        self.objective_value = pulp.value(DLP_model.objective)
+        return self.bid_prices
+    
+    def get_obj_value(self, remain_cap, curr_time):
+        self.get_bid_prices(remain_cap, curr_time)
+        return self.objective_value
+    
 # p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
-# resources = ['a', 'b']
-# capacities = [3,5]
-# arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
-# products = RM_helper.sort_product_revenues(p)
+# r = ['a', 'b']
+# c = [3,5]
+# ar = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+# ps = RM_helper.sort_product_revenues(p)
 # T = 10
-# dm = RM_demand_model.model(arrival_rates, T, 1)
-# problem = DLP(products, resources, capacities, dm)
+# dm = RM_demand_model.model(ar, T, 1)
+# problem = Network_DLP(ps, r, c, dm)
 # problem.get_bid_prices([1,2], 3)
+# print(problem.get_obj_value([3,5], 0), problem.get_bid_prices([3,5], 0))
+# print(problem.get_obj_value([2,4], 0), problem.get_bid_prices([2,4], 0))
 
 
-# In[46]:
+# In[38]:
 
-##############################
-###### DLP with DAVN  ########
-##############################
+#####################################
+###### Network_DLP with DAVN ########
+#####################################
 
-# Implement a control strategy, which at each time period, compute DLP to get static bid-prices for resources, and then
+# Implement a control strategy, which at each time period, compute Network_DLP to get static bid-prices for resources, and then
 # feed them to DAVN method to get booking limits for virtual classes on each resource. Use these booking limits to 
 # controls actual sales.
 # Assume that products are given in descending order of their revenue.
@@ -734,7 +744,7 @@ class DLP_DAVN():
         self.total_time = total_time
         
         self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
-        self.DLP_model = DLP(products, resources, capacities, demand_model)
+        self.Network_DLP_model = Network_DLP(products, resources, capacities, demand_model)
         self.DAVN_model = Network_DAVN(products, resources, capacities, n_virtual_class, demand_model)
         
     def performance(self, requests=[]):
@@ -745,7 +755,7 @@ class DLP_DAVN():
 
         remain_cap = self.capacities[:]
         for t in range(self.total_time):
-            static_bid_prices = self.DLP_model.get_bid_prices(remain_cap, t)
+            static_bid_prices = self.Network_DLP_model.get_bid_prices(remain_cap, t)
             DAVN_results = self.DAVN_model.calc_value_function(static_bid_prices, remain_cap, t)
             booking_limits = DAVN_results[1]
             indexing_scheme = DAVN_results[3]
@@ -770,23 +780,88 @@ class DLP_DAVN():
                     if willing_to_sell:
                         total_revs += self.products[curr_request][1]
                         remain_cap = [c-x for c, x in zip(remain_cap, incidence_vector)]
+#                         print("Network_DLPDAVN: request for ", self.products[curr_request][0], " rev = ", \
+#                               self.products[curr_request][1], " remain_cap= ", remain_cap, " incidence = ", incidence_vector)
 
-        consumed = [r / c for r, c in zip(remain_cap, capacities)]
+        consumed = [r / c for r, c in zip(remain_cap, self.capacities)]
         load_factor = (1 - np.mean(consumed)) * 100
         return total_revs, load_factor
 
 # p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
-# resources = ['a', 'b']
-# capacities = [3,5]
-# arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
-# products = RM_helper.sort_product_revenues(p)
+# r = ['a', 'b']
+# c = [3,5]
+# ar = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+# ps = RM_helper.sort_product_revenues(p)
 # T = 10
-# dm = RM_demand_model.model(arrival_rates, T, 1)
-# problem = DLP_DAVN(products, resources, capacities, T, 2, dm)
+# dm = RM_demand_model.model(ar, T, 1)
+# problem = DLP_DAVN(ps, r, c, T, 2, dm)
 # problem.performance()
 
 
-# In[35]:
+# In[ ]:
+
+#########################################
+###### DLP with value difference ########
+#########################################
+
+# Implement a control strategy, which at each time period, compute Network_DLP to get the difference in value functions
+# if satisfying a request for a certain product, and use that difference to control the sales.
+# Assume that products are given in descending order of their revenue.
+class DLPVD():
+    def __init__(self, products, resources, capacities, total_time, demand_model):
+        self.products = products
+        self.capacities = capacities
+        self.n_products = len(products)
+        self.n_resources = len(resources)
+        self.demand_model = demand_model
+        self.total_time = total_time
+        
+        self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
+        self.Network_DLP_model = Network_DLP(products, resources, capacities, demand_model)
+        
+    def performance(self, requests=[]):
+        if not requests:
+            requests = self.demand_model.sample_network_arrival_rates()
+        total_revs = 0
+        load_factor = 0
+
+        remain_cap = self.capacities[:]
+        for t in range(self.total_time):            
+            curr_request = requests[t]
+            
+            if curr_request < self.n_products:
+                # i.e. a request has arrived at time period t
+                incidence_vector = [row[curr_request] for row in self.incidence_matrix]
+                product_name = self.products[curr_request][0]
+                
+                remain_cap_if_sell = [c - x for c,x in zip(remain_cap, incidence_vector)]
+                if all(x >= 0 for x in remain_cap_if_sell):
+                    # only sell if there are enough capacities of required resources
+                    value_before_sell = self.Network_DLP_model.get_obj_value(remain_cap, t)
+                    value_after_sell = self.Network_DLP_model.get_obj_value(remain_cap_if_sell, t)
+                    
+                    rev = self.products[curr_request][1]
+                    if rev >= (value_before_sell - value_after_sell):
+                        # willing to sell
+                        total_revs += rev
+                        remain_cap = remain_cap_if_sell[:]
+                        
+        consumed = [r / c for r, c in zip(remain_cap, self.capacities)]
+        load_factor = (1 - np.mean(consumed)) * 100
+        return total_revs, load_factor
+
+# p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
+# r = ['a', 'b']
+# c = [3,5]
+# ar = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+# ps = RM_helper.sort_product_revenues(p)
+# T = 10
+# dm = RM_demand_model.model(ar, T, 1)
+# problem = DLPVD(ps, r, c, T, dm)
+# problem.performance()
+
+
+# In[ ]:
 
 ##############################
 ###### iterative_DAVN ########

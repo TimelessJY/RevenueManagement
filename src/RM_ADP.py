@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[33]:
+# In[1]:
 
 import numpy as np
 import scipy.stats
@@ -19,7 +19,7 @@ import RM_approx
 import pulp
 
 
-# In[15]:
+# In[2]:
 
 ##############################################
 ###### ADP: using one-state_transition #######
@@ -184,7 +184,7 @@ problem = One_state_transition(products, resources, demands, capacities, 10)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[76]:
+# In[3]:
 
 #############################################
 ###### ADP: DP with feature extraction ######
@@ -371,7 +371,7 @@ problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[34]:
+# In[7]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -402,7 +402,7 @@ class ALP():
             self.n_states *= (c+1)
             
         self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
-        self.DLP_model = RM_approx.DLP(products, resources, capacities, demand_model)
+        self.DLP_model = RM_approx.Network_DLP(products, resources, capacities, demand_model)
         
     def simulate_bid_prices_control(self, initial_state, bid_prices, t):
         """helper func: sample a single request, and use the given bid-prices to simulate the optimal control."""
@@ -412,8 +412,9 @@ class ALP():
         if sampled_request < self.n_products:
             # a request actually occurs
             incidence = [row[sampled_request] for row in self.incidence_matrix]
-            if incidence <= initial_state and np.dot(incidence, bid_prices) <= self.products[sampled_request][1]:
-                new_state = [new_i - inc_i for new_i, inc_i in zip(new_state, incidence)]
+            if all([x <= c for x, c in zip(incidence, new_state)]):
+                if np.dot(incidence, bid_prices) <= self.products[sampled_request][1]:
+                    new_state = [new_i - inc_i for new_i, inc_i in zip(new_state, incidence)]
         return new_state
 
     def generate_basis_func(self, remain_cap):
@@ -604,7 +605,7 @@ class ALP():
 # problem.get_bid_prices(10)
 
 
-# In[4]:
+# In[5]:
 
 #################################################
 ###### ADP: double-leg based decomposition ######

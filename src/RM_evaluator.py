@@ -250,7 +250,7 @@ iteration = 100
 
 
 
-# In[ ]:
+# In[5]:
 
 p = 0.5
 def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
@@ -261,7 +261,7 @@ def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
         resources, itineraries, arrival_rates = generate_network(n_spoke, demand_type, n_fare_class)
         products = extract_legs_info(itineraries, resources)
         capacities = [cap] * len(resources)
-        total_time = cap * len(resources) * 2
+        total_time = cap * len(resources) * 5
         dm = None
         dm = RM_demand_model.model(arrival_rates, total_time, demand_type, p)
         
@@ -270,14 +270,13 @@ def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
         
     return problem_sets
     
-def compare_with_DP(n_spoke, cap, iterations, n_virtual_class, K):
+def compare_with_DP(total_num, n_spoke, cap, iterations, n_virtual_class, K):
     """ small network problems, solved by DP, DLPDAVN, and ADP respectively """
-    col_titles = ["rev_DLPDAVN_mean %",  "rev_LPADP_mean %", ]
+    col_titles = ["rev_DLPDAVN_mean %", "loadF_DLPDAVN_mean %", "rev_LPADP_mean %", "loadF_LPADP_mean %",                   "rev_DLPVD_mean %", "loadF_DLPVD_mean"]
     table_data = []
-    problems = generate_samples(10, n_spoke, cap, 1, 1)
+    problems = generate_samples(total_num, n_spoke, cap, 1, 1)
     for prob in problems:
-        diff_DLPDAVN = []
-        diff_LPADP = []
+        compare_results = [[] for _ in range(len(col_titles))]
         
         products = prob[0]
         resources = prob[1]
@@ -289,6 +288,7 @@ def compare_with_DP(n_spoke, cap, iterations, n_virtual_class, K):
         exactDP_model = RM_exact.Network_RM(products, resources, capacities, total_time, demand_model)
         DLPDAVN_model = RM_approx.DLP_DAVN(products, resources, capacities, total_time, n_virtual_class, demand_model)
         LPADP_model = RM_ADP.ALP(products, resources, capacities, total_time, demand_model)
+        DLPVD_model = RM_approx.DLPVD(products, resources, capacities, total_time, demand_model)
         
         exactDP_bid_prices = exactDP_model.get_bid_prices()
         LPADP_bid_prices = LPADP_model.get_bid_prices(K)
@@ -299,20 +299,27 @@ def compare_with_DP(n_spoke, cap, iterations, n_virtual_class, K):
             requests = demand_model.sample_network_arrival_rates()
             
             eval_results = RM_compare.simulate_network_bidprices_control(bid_prices, products, resources, capacities,                                                                         total_time, requests)
-            print("eval_results: ", eval_results)
             exactDP_rev = eval_results[0][0]
-            LPADP_rev = eval_results[0][0]
-            DLPDAVN_rev = DLPDAVN_model.performance(requests)[0]
+            exactDP_LF = eval_results[0][1]
             
-            diff_LPADP.append((exactDP_rev - LPADP_rev)/exactDP_rev)
-            diff_DLPDAVN.append((exactDP_rev - DLPDAVN_rev)/exactDP_rev)
+            DLPDAVN_result = DLPDAVN_model.performance(requests)
+            compare_results[0].append((exactDP_rev - DLPDAVN_result[0])/exactDP_rev)
+            compare_results[1].append((exactDP_LF - DLPDAVN_result[1]) / exactDP_LF)
             
-        table_data.append([np.mean(diff_LPADP) * 100, np.mean(diff_DLPDAVN) * 100])
+            LPADP_results = eval_results[1]
+            compare_results[2].append((exactDP_rev - LPADP_results[0])/exactDP_rev)
+            compare_results[3].append((exactDP_LF - LPADP_results[1]) / exactDP_LF)
             
-    print(pandas.DataFrame(table_data, range(len(problems)), col_titles))
+            DLPVD_result = DLPVD_model.performance(requests)
+            compare_results[4].append((exactDP_rev - DLPVD_result[0])/exactDP_rev)
+            compare_results[5].append((exactDP_LF - DLPVD_result[1]) / exactDP_LF)
+            
+        table_data.append([np.mean(result) * 100 for result in compare_results])
+            
+    print(pandas.DataFrame(table_data,  columns = col_titles))
     return table_data
     
-compare_with_DP(20, 3, 3, 3, 40)
+# result = compare_with_DP(15, 3, 3, 3, 3, 20)
 
 
 # In[ ]:
