@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[4]:
+# In[1]:
 
 import numpy as np
 import time
@@ -11,7 +11,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-# In[5]:
+# In[6]:
 
 def sort_product_demands(products):
     """
@@ -66,7 +66,7 @@ def calc_incidence_matrix(products, resources):
     return incidence_matrix
 
 
-# In[107]:
+# In[3]:
 
 def state_index(n_states, capacities, remain_cap):
     """converts the given array of remaining capacities into the state number"""
@@ -103,7 +103,7 @@ def remain_cap(n_states, capacities, state_number):
     return remain_cap
 
 
-# In[108]:
+# In[4]:
 
 def sample_network_demands(demands, total_time):
     """samples a series of index of products, whose request arrives at each period in the given total time """
@@ -133,7 +133,7 @@ def sample_single_static_demands(demands):
     return sampled_demands
 
 
-# In[109]:
+# In[9]:
 
 def network_bid_prices(value_func, products, resources, capacities, incidence_matrix, n_states):
     """Calculate the bid prices for resources at every state in every time period."""
@@ -172,7 +172,8 @@ def network_bid_prices(value_func, products, resources, capacities, incidence_ma
                     A_solve = A[:n_resources]
                     b_solve = b[:n_resources]
 #                     print("A,b=", A_solve, b_solve)
-                    bp = np.linalg.solve(A_solve, b_solve)
+#                     bp = np.linalg.solve(A_solve, b_solve)
+                    bp, residuals, rank, singular_vals = np.linalg.lstsq(A, b)
 #                     print("result=", bp)
                     bp_t_s = [0 if x < 0 else x for x in bp]
 

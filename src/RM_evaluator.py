@@ -250,7 +250,7 @@ iteration = 100
 
 
 
-# In[6]:
+# In[ ]:
 
 p = 0.5
 def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
@@ -261,7 +261,7 @@ def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
         resources, itineraries, arrival_rates = generate_network(n_spoke, demand_type, n_fare_class)
         products = extract_legs_info(itineraries, resources)
         capacities = [cap] * len(resources)
-        total_time = cap * 3
+        total_time = cap * len(resources) * 2
         dm = None
         dm = RM_demand_model.model(arrival_rates, total_time, demand_type, p)
         
@@ -299,7 +299,7 @@ def compare_with_DP(n_spoke, cap, iterations, n_virtual_class, K):
             requests = demand_model.sample_network_arrival_rates()
             
             eval_results = RM_compare.simulate_network_bidprices_control(bid_prices, products, resources, capacities,                                                                         total_time, requests)
-#             print("eval_results: ", eval_results)
+            print("eval_results: ", eval_results)
             exactDP_rev = eval_results[0][0]
             LPADP_rev = eval_results[0][0]
             DLPDAVN_rev = DLPDAVN_model.performance(requests)[0]
@@ -312,7 +312,7 @@ def compare_with_DP(n_spoke, cap, iterations, n_virtual_class, K):
     print(pandas.DataFrame(table_data, range(len(problems)), col_titles))
     return table_data
     
-# compare_with_DP(3, 5, 3, 3, 10)
+compare_with_DP(20, 3, 3, 3, 40)
 
 
 # In[ ]:
