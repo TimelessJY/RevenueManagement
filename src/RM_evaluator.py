@@ -156,7 +156,7 @@ def extract_legs_info(products, resources):
 # extract_legs_info(itineraries, resources)
 
 
-# In[3]:
+# In[25]:
 
 def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
     """Compare the EMSR-b method, with single-static DP model."""
@@ -164,18 +164,24 @@ def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
     
     diff_percents = []
     
+    exact_time = time.time()
     exact = RM_exact.Single_RM_static(products, demands, cap)
     exact_bid_prices = exact.get_bid_prices()
     exact_protection_levels = exact.get_protection_levels()
+    exact_time = time.time() - exact_time
     
+    heuri_time = time.time()
     heuri = RM_approx.Single_EMSR(products, demands, cap)
     heuri_protection_levels = heuri.get_protection_levels()
+    heuri_time = time.time() - heuri_time
 
     bid_prices = [exact_bid_prices]
     protection_levels = [exact_protection_levels, heuri_protection_levels]
     
+    # comparison result of exact method using bid-price control and protection-level control
     exact_revs_diff = []
     exact_LF_diff = []
+    # comparison result of exact method vs EMSR-b method, both using protection-level control
     exact_heuri_revs_diff = []
     exact_heuri_LF_diff = []
 
@@ -194,13 +200,14 @@ def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
         exact_heuri_LF_diff.append(round((exact_pl_LF - pl_result[1][1]) / exact_pl_LF, 5))
 
     results+= [np.mean(exact_revs_diff) * 100, np.mean(exact_LF_diff) * 100, heuri_protection_levels, 
-               np.mean(exact_heuri_revs_diff) * 100, np.mean(exact_heuri_LF_diff) * 100]
+               np.mean(exact_heuri_revs_diff) * 100, np.std(exact_heuri_revs_diff),
+               np.mean(exact_heuri_LF_diff) * 100, np.std(exact_heuri_revs_diff), exact_time, heuri_time]
     return results
 
 def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
     """Visualize the performance of EMSR-b method, against single-static DP model."""
     capacities = [c for c in range(cap_lb, cap_ub + 1, cap_interval)]
-    col_titles = ["exact-protection_levels", "mean-diff_exact %", "mean_diff_exact_LF %", "EMSR-b-protection_levels",                   "mean-diff_pl %", "mean-diff_pl_LF %"]
+    col_titles = ["exact-protection_levels", "mean-diff_exact %", "mean_diff_exact_LF %", "EMSR-b-protection_levels",                   "mean-diff_pl %", "std-diff_pl", "mean-diff_pl_LF %", "std-diff_pl_LF", "time_dp", "time_emsrb"]
 
     table_data = []
     
@@ -212,12 +219,12 @@ def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
     print(pandas.DataFrame(table_data, capacities, col_titles))
     return table_data
 
-pros = [[1, 1050,(17.3, 5.8)], [2, 567, (45.1, 15.0)], [3, 534, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
-# pros = [[1, 1050,(17.3, 5.8)], [2, 950, (45.1, 15.0)], [3, 699, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
-cap_lb = 80
-cap_ub = 160
-cap_interval = 10
-iteration = 100
+# pros = [[1, 1050,(17.3, 5.8)], [2, 567, (45.1, 15.0)], [3, 534, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
+# # pros = [[1, 1050,(17.3, 5.8)], [2, 950, (45.1, 15.0)], [3, 699, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
+# cap_lb = 50
+# cap_ub = 150
+# cap_interval = 10
+# iteration = 1000
 
 # data = visualize_perf_EMSR_b(pros, cap_lb, cap_ub,cap_interval,iteration)
 # exact_revs = [d[1] for d in data]
@@ -236,18 +243,32 @@ iteration = 100
 
 
 # exact_heuri_revs = [d[4] for d in data]
-# exact_heuri_LF = [d[5] for d in data]
+# exact_heuri_revs_std = [d[5] for d in data]
+# exact_heuri_LF = [d[6] for d in data]
+# exact_heuri_LF_std = [d[7] for d in data]
+# exact_time = [d[8] for d in data]
+# heuri_time = [d[9] for d in data]
+
 # plt.clf()
 # x= np.linspace(cap_lb, cap_ub, (cap_ub - cap_lb) / cap_interval + 1)
-# plt.plot(x, exact_heuri_revs, linestyle='dashed', marker='s', label='Revenue Difference')
-# plt.plot(x, exact_heuri_LF, linestyle='dashed', marker = 'o', label='Load Factor Difference')
+# plt.plot(x, exact_heuri_revs, linestyle='dashed', marker='s', label='Revenue Difference %')
+# plt.plot(x, exact_heuri_LF, linestyle='dashed', marker = 'o', label='Load Factor Difference %')
     
 # plt.legend()
-# plt.ylabel('Exact vs EMSR-b Protection-levels Control')
+# plt.ylabel('Exact DP vs EMSR-b')
 # plt.xlabel('Resource Capacity')
 # # plt.show()
 # plt.savefig('single_static_diff')
 
+# plt.clf()
+# plt.plot(x, exact_time, linestyle='dashed', marker='s', label='Exact DP')
+# plt.plot(x, heuri_time, linestyle='dashed', marker = 'o', label='EMSR-b')
+    
+# plt.legend()
+# plt.ylabel('Exact DP vs EMSR-b: Planning Time (s)')
+# plt.xlabel('Resource Capacity')
+# # plt.show()
+# plt.savefig('single_static_time_diff')
 
 
 # In[5]:
