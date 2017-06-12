@@ -156,7 +156,7 @@ def extract_legs_info(products, resources):
 # extract_legs_info(itineraries, resources)
 
 
-# In[25]:
+# In[36]:
 
 def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
     """Compare the EMSR-b method, with single-static DP model."""
@@ -220,7 +220,7 @@ def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
     return table_data
 
 # pros = [[1, 1050,(17.3, 5.8)], [2, 567, (45.1, 15.0)], [3, 534, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
-# # pros = [[1, 1050,(17.3, 5.8)], [2, 950, (45.1, 15.0)], [3, 699, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
+# pros = [[1, 1050,(17.3, 5.8)], [2, 950, (45.1, 15.0)], [3, 699, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
 # cap_lb = 50
 # cap_ub = 150
 # cap_interval = 10
@@ -240,7 +240,6 @@ def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
 # plt.xlabel('Resource Capacity')
 # # plt.show()
 # plt.savefig('single_static_exact_diff')
-
 
 # exact_heuri_revs = [d[4] for d in data]
 # exact_heuri_revs_std = [d[5] for d in data]
@@ -341,6 +340,87 @@ def compare_with_DP(total_num, n_spoke, cap, iterations, n_virtual_class, K):
     return table_data
     
 # result = compare_with_DP(15, 3, 3, 3, 3, 20)
+
+
+# In[35]:
+
+# Draw the graph of running time of the network_DP model
+def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
+    """Evaluate the network DP method, trying with different capacities of resource, and different total time."""
+    n_resources = len(resources)
+    col_titles = ['Revenue', 'Bid Prices', 'Time']
+    capacities = [c for c in range(cap_lb, cap_ub + 1)]
+    
+    table = []
+    pros, arrival_rates, _ = RM_helper.sort_product_demands(products)
+    print("arrival_rates", arrival_rates)
+    demand_model = RM_demand_model.model([arrival_rates], total_time, 1)
+    
+    for cap in capacities:
+        caps = [cap] * n_resources
+        
+        result= []
+        
+        DP_time = time.time()
+        problem = RM_exact.Network_RM(pros, resources, caps, total_time, demand_model)
+        DP_vf = problem.calc_value_func()
+        bid_prices = problem.get_bid_prices()
+        DP_time = time.time() - DP_time
+
+        result.append(DP_vf[0][-1])
+        result.append(bid_prices)
+        result.append(DP_time)
+        
+        table.append(result)
+        
+    print(pandas.DataFrame(table, capacities, col_titles))
+    return table
+        
+# ps1 = [['a1', 200,0.02], ['a2', 503, 0.06], ['ab1', 400, 0.08],['ab2', 704, 0.01], ['b1', 601, 0.05], \
+#       ['b2', 106, 0.12], ['bc', 920, 0.03],['c1', 832, 0.07], ['d1', 397, 0.14], ['d2', 533, 0.18], ['ad', 935, 0.09],\
+#       ['ae', 205, 0.013],['f3', 589, 0.004], ['fb', 422, 0.009]]
+# rs1 = ['a', 'b', 'c', 'd', 'e', 'f']
+
+# ps2 = [['a1', 200,0.02], ['a2', 503, 0.06], ['ab1', 400, 0.08],['ab2', 704, 0.01], ['b1', 601, 0.05], \
+#       ['b2', 106, 0.12], ['bc', 920, 0.03],['c1', 832, 0.07]]
+# rs2 = ['a', 'b', 'c']
+
+# cap_ub = 8
+# T = 10
+# ps = ps1
+# rs = rs1
+# tables = []
+# final_result = []
+# for i in range(3):
+#     performance = eval_networkDP_runningTime(ps, rs, 1, cap_ub, T * (i + 1))
+#     tables.append(performance)
+#     final_result.append(([d[0] for d in performance], [d[2] for d in performance]))
+
+# x= np.linspace(1, cap_ub, cap_ub)
+
+# plt.clf()
+# line1, = plt.plot(x,final_result[0][0], marker='^', label='max_time='+str(T))
+# line2, = plt.plot(x,final_result[1][0], marker='o', label='max_time='+str(T * 2))
+# line3, = plt.plot(x,final_result[2][0], marker='x', label='max_time='+str(T * 3))
+
+# plt.legend(handler_map={line1: HandlerLine2D(numpoints=1),line2: HandlerLine2D(numpoints=1),
+#                         line3: HandlerLine2D(numpoints=1)})
+# plt.ylabel('Expected Revenue')
+# plt.xlabel('Resource Capacity')
+# # plt.show()
+# plt.savefig('network-DP-revs-3resource')
+
+# plt.clf()
+# line1, = plt.plot(x,final_result[0][1], marker='^', label='max_time='+str(T))
+# line2, = plt.plot(x,final_result[1][1], marker='o', label='max_time='+str(T * 2))
+# line3, = plt.plot(x,final_result[2][1], marker='x', label='max_time='+str(T * 3))
+
+# plt.legend(handler_map={line1: HandlerLine2D(numpoints=1),line2: HandlerLine2D(numpoints=1),
+#                         line3: HandlerLine2D(numpoints=1)})
+# plt.ylabel('Running Time(s)')
+# plt.xlabel('Resource Capacity')
+# # plt.show()
+# plt.savefig('network-DP-time-3resource')
 
 
 # In[ ]:

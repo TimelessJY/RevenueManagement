@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[26]:
 
 import pandas
 import time
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from matplotlib.legend_handler import HandlerLine2D
 
 
-# In[2]:
+# In[27]:
 
 def compare_iDAVN_singleDPstatic(products, resources, n_class, cap_lb, cap_ub, cap_interval):
     """Compare the iterative DAVN method, with a collection of single-resource static DP model."""
@@ -111,87 +111,7 @@ resources = ['a', 'b']
 # plt.savefig('DAVN-ssDP-diff')
 
 
-# In[3]:
-
-# Draw the graph of running time of the network_DP model
-def eval_networkDP_changingCap(products, resources, cap_lb, cap_ub, total_time):
-    """Evaluate the network DP method, trying with different capacities of resource, and different total time."""
-    n_resources = len(resources)
-    col_titles = ['Revenue', 'Bid Prices', 'Time']
-    capacities = [c for c in range(cap_lb, cap_ub + 1)]
-    
-    table = []
-    (pros, demands, demands_with_names) = RM_helper.sort_product_demands(products)
-    for cap in capacities:
-        caps = [cap] * n_resources
-        
-        result= []
-        
-        DP_time = time.time()
-        problem = RM_exact.Network_RM(pros, resources, [demands], caps, total_time)
-        DP_vf = problem.value_func()
-        bid_prices = problem.bid_price(total_time, caps)
-        DP_time = time.time() - DP_time
-
-        result.append(DP_vf[0][-1])
-        result.append(bid_prices)
-        result.append(DP_time)
-        
-        table.append(result)
-        
-    print(pandas.DataFrame(table, capacities, col_titles))
-    return table
-        
-
-# ps1 = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601], ['b2', 0.12, 106],\
-#             ['bc', 0.03, 920],['c1', 0.07, 832],['d1', 0.14, 397], ['d2',  0.18, 533], ['ad', 0.09, 935], \
-#       ['ae', 0.013, 205],['f3', 0.004, 589], ['fb', 0.009, 422]]
-# rs1 = ['a', 'b', 'c', 'd', 'e', 'f']
-
-# ps2 = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601], \
-#       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
-# rs2 = ['a', 'b', 'c']
-
-# cap_ub = 8
-# T = 5
-# table1 = eval_networkDP_changingCap(ps1, rs1, 1, cap_ub,T)
-# table2 = eval_networkDP_changingCap(ps1, rs1, 1, cap_ub, 2*T)
-# table3 = eval_networkDP_changingCap(ps1, rs1, 1, cap_ub, 3*T)
-
-# x= np.linspace(1, cap_ub, cap_ub)
-# revs1 = [d[0] for d in table1]
-# time1 = [d[2] for d in table1]
-# revs2 = [d[0] for d in table2]
-# time2 = [d[2] for d in table2]
-# revs3 = [d[0] for d in table3]
-# time3 = [d[2] for d in table3]
-
-# plt.clf()
-# line1, = plt.plot(x,revs1, marker='^', label='max_time='+str(T))
-# line2, = plt.plot(x,revs2, marker='o', label='max_time='+str(T))
-# line3, = plt.plot(x,revs3, marker='x', label='max_time='+str(T))
-# # line2, = plt.plot(x,revs_singleDP, marker='o', label='Single_Static_DP')
-
-# plt.legend(handler_map={line1: HandlerLine2D(numpoints=1),line2: HandlerLine2D(numpoints=1),line3: HandlerLine2D(numpoints=1)})
-# # legend = ax.legend(loc='upper center')
-# plt.ylabel('Expected Revenue')
-# plt.xlabel('Resource Capacity')
-# plt.show()
-# plt.savefig('network-DP-revs-6')
-
-# plt.clf()
-# line1, = plt.plot(x,time1, marker='^', label='max_time='+str(T))
-# line2, = plt.plot(x,time2, marker='o', label='max_time='+str(T))
-# line3, = plt.plot(x,time3, marker='x', label='max_time='+str(T))
-
-# plt.legend(handler_map={line1: HandlerLine2D(numpoints=1),line2: HandlerLine2D(numpoints=1),line3: HandlerLine2D(numpoints=1)})
-# plt.ylabel('Running Time(s)')
-# plt.xlabel('Resource Capacity')
-# # plt.show()
-# plt.savefig('network-DP-time-6')
-
-
-# In[4]:
+# In[28]:
 
 def evaluate_network_control(products, resources, demands, capacities, approxed_bid_prices, total_time, iterations):
     """using the given bid-prices of a heuristic/approximation to evaluate the difference between revenues gained 
@@ -250,7 +170,7 @@ def decide_to_sell(incidence_vector, remained_cap, resource_bid_prices, profit, 
     return all(x_i <= c_i for x_i, c_i in zip(incidence_vector, remained_cap)) and profit >= opportunity_cost
 
 
-# In[5]:
+# In[29]:
 
 def eval_ADP_DPf(pros, resources, capacities, total_time, iterations):
     """Compare the ADP algorithm using DP model with feature extraction, with exact DP model of network problems."""
@@ -310,7 +230,7 @@ def visualize_perf_ADP_DPf(products, resources, T_lb, T_ub, T_interval, cap_lb, 
 # plt.savefig('ADP_DPf_networkDP-rev-diff')
 
 
-# In[6]:
+# In[30]:
 
 def simulate_single_static_bidprices_control(bid_prices, products, demands, capacity, requests = []):
     """Simulates bid-price control, on a single-static problem, with initial capacity given. 
@@ -405,7 +325,7 @@ exact = RM_exact.Single_RM_static(products, demands, cap)
 # print(simulate_single_static_protectionlevel_control([exact_pl, EMSR_pl], products, demands, cap))
 
 
-# In[11]:
+# In[31]:
 
 def simulate_network_bidprices_control(bid_prices, products, resources,  capacities, T, requests):
     """Simulates bid-price control over the horizon T, on a network problems, with initial capacity given. 
