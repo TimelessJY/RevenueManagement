@@ -307,7 +307,7 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[34]:
+# In[74]:
 
 ##############################
 ###### network_DAVN ##########
@@ -648,12 +648,12 @@ class Network_DAVN():
 # dm = RM_demand_model.model(ar, T, 1)
 # davn_prob = Network_DAVN(ps, r, c, nvc, dm)
 # vf = davn_prob.calc_value_function(sp, [60, 60], 0)
-# # print(vf)
+# print(vf)
 # # print(davn_prob.calc_displacement_adjusted_revenue(sp))
 # # print(davn_prob.disp_adjusted_revs)
 
 
-# In[51]:
+# In[70]:
 
 ##############################
 ###### Network_DLP approach   ########
@@ -724,7 +724,7 @@ class Network_DLP():
 # print(problem.get_obj_value([2,4], 0), problem.get_bid_prices([2,4], 0))
 
 
-# In[38]:
+# In[78]:
 
 #####################################
 ###### Network_DLP with DAVN ########
@@ -747,6 +747,14 @@ class DLP_DAVN():
         self.Network_DLP_model = Network_DLP(products, resources, capacities, demand_model)
         self.DAVN_model = Network_DAVN(products, resources, capacities, n_virtual_class, demand_model)
         
+        # use DLP model to get initial static prices for resources, then use DAVN to get booking limits
+        initial_static_price = self.Network_DLP_model.get_bid_prices(capacities, 0)
+        davn_result = self.DAVN_model.calc_value_function(initial_static_price, capacities, 0)
+        self.booking_limits = davn_result[1]
+        self.indexing_scheme = davn_result[3]
+#         print("booking limits: ", self.booking_limits)
+#         print("indexing scheme: ", self.indexing_scheme)
+        
     def performance(self, requests=[]):
         if not requests:
             requests = self.demand_model.sample_network_arrival_rates()
@@ -755,33 +763,30 @@ class DLP_DAVN():
 
         remain_cap = self.capacities[:]
         for t in range(self.total_time):
-            static_bid_prices = self.Network_DLP_model.get_bid_prices(remain_cap, t)
-            DAVN_results = self.DAVN_model.calc_value_function(static_bid_prices, remain_cap, t)
-            booking_limits = DAVN_results[1]
-            indexing_scheme = DAVN_results[3]
-            
             curr_request = requests[t]
             if curr_request < self.n_products:
                 # i.e. a request has arrived at time period t
                 incidence_vector = [row[curr_request] for row in self.incidence_matrix]
                 product_name = self.products[curr_request][0]
-
+                
                 if all(x <= c for x, c in zip(incidence_vector, remain_cap)):
                     # only sell if there are enough capacities of required resources
                     willing_to_sell = True
                     for i in range(self.n_resources):
                         if incidence_vector[i] == 1:
-                            virtual_class = indexing_scheme[i][product_name]
-                            mean_demand = self.demand_model.current_mean_demands(t)[curr_request]
-                            if mean_demand > booking_limits[i][virtual_class]:
+                            virtual_class = self.indexing_scheme[i][product_name]
+                            if self.booking_limits[i][virtual_class] == 0:
                                 willing_to_sell = False
                                 break
-
+                    
                     if willing_to_sell:
                         total_revs += self.products[curr_request][1]
                         remain_cap = [c-x for c, x in zip(remain_cap, incidence_vector)]
-#                         print("Network_DLPDAVN: request for ", self.products[curr_request][0], " rev = ", \
-#                               self.products[curr_request][1], " remain_cap= ", remain_cap, " incidence = ", incidence_vector)
+                        for i in range(self.n_resources):
+                            if incidence_vector[i] == 1:
+                                virtual_class = self.indexing_scheme[i][product_name]
+                                self.booking_limits[i][virtual_class] -= 1
+#                         print("t= ", t, " request = ", product_name, " sell, bookinglimits=", self.booking_limits)
 
         consumed = [r / c for r, c in zip(remain_cap, self.capacities)]
         load_factor = (1 - np.mean(consumed)) * 100
