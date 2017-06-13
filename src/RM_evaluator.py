@@ -156,7 +156,7 @@ def extract_legs_info(products, resources):
 # extract_legs_info(itineraries, resources)
 
 
-# In[36]:
+# In[3]:
 
 def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
     """Compare the EMSR-b method, with single-static DP model."""
@@ -184,6 +184,7 @@ def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
     # comparison result of exact method vs EMSR-b method, both using protection-level control
     exact_heuri_revs_diff = []
     exact_heuri_LF_diff = []
+    exact_revs = []
 
     results = [exact_protection_levels]
     for i in range(iterations):
@@ -198,16 +199,18 @@ def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
         exact_LF_diff.append(round((exact_pl_LF - bp_result[0][1])/ exact_pl_LF, 5))
         exact_heuri_revs_diff.append(round((exact_pl_rev - pl_result[1][0])/exact_pl_rev, 5))
         exact_heuri_LF_diff.append(round((exact_pl_LF - pl_result[1][1]) / exact_pl_LF, 5))
+        exact_revs.append(exact_pl_rev)
 
     results+= [np.mean(exact_revs_diff) * 100, np.mean(exact_LF_diff) * 100, heuri_protection_levels, 
                np.mean(exact_heuri_revs_diff) * 100, np.std(exact_heuri_revs_diff),
-               np.mean(exact_heuri_LF_diff) * 100, np.std(exact_heuri_revs_diff), exact_time, heuri_time]
+               np.mean(exact_heuri_LF_diff) * 100, np.std(exact_heuri_revs_diff), exact_time, heuri_time,
+               np.mean(exact_revs)]
     return results
 
 def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
     """Visualize the performance of EMSR-b method, against single-static DP model."""
     capacities = [c for c in range(cap_lb, cap_ub + 1, cap_interval)]
-    col_titles = ["exact-protection_levels", "mean-diff_exact %", "mean_diff_exact_LF %", "EMSR-b-protection_levels",                   "mean-diff_pl %", "std-diff_pl", "mean-diff_pl_LF %", "std-diff_pl_LF", "time_dp", "time_emsrb"]
+    col_titles = ["exact-protection_levels", "mean-diff_exact %", "mean_diff_exact_LF %", "EMSR-b-protection_levels",                   "mean-diff_pl %", "std-diff_pl", "mean-diff_pl_LF %", "std-diff_pl_LF", "time_dp", "time_emsrb",                   "total_rev_exact"]
 
     table_data = []
     
@@ -220,7 +223,7 @@ def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
     return table_data
 
 # pros = [[1, 1050,(17.3, 5.8)], [2, 567, (45.1, 15.0)], [3, 534, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
-# pros = [[1, 1050,(17.3, 5.8)], [2, 950, (45.1, 15.0)], [3, 699, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
+# # pros = [[1, 1050,(17.3, 5.8)], [2, 950, (45.1, 15.0)], [3, 699, (39.6, 13.2)], [4,520,(34.0, 11.3)]]
 # cap_lb = 50
 # cap_ub = 150
 # cap_interval = 10
@@ -270,7 +273,7 @@ def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
 # plt.savefig('single_static_time_diff')
 
 
-# In[5]:
+# In[4]:
 
 p = 0.5
 def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
@@ -290,11 +293,12 @@ def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
         
     return problem_sets
     
-def compare_with_DP(total_num, n_spoke, cap, iterations, n_virtual_class, K):
+def compare_with_DP(total_num, n_spoke, cap, iterations, demand_type, n_virtual_class, K):
     """ small network problems, solved by DP, DLPDAVN, and ADP respectively """
-    col_titles = ["rev_DLPDAVN_mean %", "loadF_DLPDAVN_mean %", "rev_LPADP_mean %", "loadF_LPADP_mean %",                   "rev_DLPVD_mean %", "loadF_DLPVD_mean"]
+    col_titles = ["rev_DLPDAVN_mean %", "loadF_DLPDAVN_mean %", "rev_LPADP_mean %", "loadF_LPADP_mean %", 
+                  "rev_DLPVD_mean %", "loadF_DLPVD_mean","exact_rev", "exact_LF"]
     table_data = []
-    problems = generate_samples(total_num, n_spoke, cap, 1, 1)
+    problems = generate_samples(total_num, n_spoke, cap, demand_type, 1)
     for prob in problems:
         compare_results = [[] for _ in range(len(col_titles))]
         
@@ -303,7 +307,6 @@ def compare_with_DP(total_num, n_spoke, cap, iterations, n_virtual_class, K):
         capacities = prob[2]
         total_time = prob[3]
         demand_model = prob[4]
-        a = demand_model.arrival_rates['low']
         
         exactDP_model = RM_exact.Network_RM(products, resources, capacities, total_time, demand_model)
         DLPDAVN_model = RM_approx.DLP_DAVN(products, resources, capacities, total_time, n_virtual_class, demand_model)
@@ -334,15 +337,18 @@ def compare_with_DP(total_num, n_spoke, cap, iterations, n_virtual_class, K):
             compare_results[4].append((exactDP_rev - DLPVD_result[0])/exactDP_rev)
             compare_results[5].append((exactDP_LF - DLPVD_result[1]) / exactDP_LF)
             
+            compare_results[6].append(exactDP_rev)
+            compare_results[7].append(exactDP_LF / 100)
+            
         table_data.append([np.mean(result) * 100 for result in compare_results])
             
     print(pandas.DataFrame(table_data,  columns = col_titles))
     return table_data
     
-# result = compare_with_DP(15, 3, 3, 3, 3, 20)
+result = compare_with_DP(15, 3, 3, 50, 2, 3, 20)
 
 
-# In[35]:
+# In[5]:
 
 # Draw the graph of running time of the network_DP model
 def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
@@ -421,6 +427,68 @@ def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
 # plt.xlabel('Resource Capacity')
 # # plt.show()
 # plt.savefig('network-DP-time-3resource')
+
+
+# In[6]:
+
+# compare different numbers of virtual classes that DAVN decomposes into, in terms of revenue performance
+def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, max_vc):
+    problems = generate_samples(total_num, n_spoke, cap, demand_type, 1)
+    col_titles = ["exact_rev", "exact_LF"]
+    n_products = len(problems[0][0])
+    max_vc = min(max_vc, n_products)
+    col_titles+= ["perf " + str(i) + "%" for i in range(1, max_vc)]
+    table_data = []
+    for prob in problems:
+        compare_results = [[] for _ in range(len(col_titles))]
+        
+        products = prob[0]
+        resources = prob[1]
+        capacities = prob[2]
+        total_time = prob[3]
+        demand_model = prob[4]
+        
+        exactDP_model = RM_exact.Network_RM(products, resources, capacities, total_time, demand_model)
+        exactDP_bid_prices = exactDP_model.get_bid_prices()
+        bid_prices = [exactDP_bid_prices]
+        
+        col = 1
+        for n_vc in range(1, max_vc):
+            DLPDAVN_time = time.time()
+            DLPDAVN_model = RM_approx.DLP_DAVN(products, resources, capacities, total_time, n_vc, demand_model)
+            DLPDAVN_time = time.time() - DLPDAVN_time
+            
+            DLP_rev = []
+            DLP_LF = []
+            DLPDAVN_rev_diff = []
+            DLPDAVN_LF_diff = []
+            
+            for i in range(iterations):
+                requests = demand_model.sample_network_arrival_rates()
+                if n_vc == 1:
+                    eval_results = RM_compare.simulate_network_bidprices_control(bid_prices, products, resources,                                                                                  capacities, total_time, requests)
+                    exactDP_rev = eval_results[0][0]
+                    exactDP_LF = eval_results[0][1]
+
+                    DLP_rev.append(exactDP_rev)
+                    DLP_LF.append(exactDP_LF)
+                
+                DLPDAVN_result = DLPDAVN_model.performance(requests)
+#                 print("exact_rev = ",exactDP_rev, " DLPDAVN_rev = ", DLPDAVN_result[0])
+                DLPDAVN_rev_diff.append((exactDP_rev - DLPDAVN_result[0])/exactDP_rev * 100)
+                DLPDAVN_LF_diff.append((exactDP_LF - DLPDAVN_result[1])/exactDP_LF * 100)
+                
+            if DLP_rev:
+                compare_results[0].append(np.mean(DLP_rev))
+                compare_results[1].append(np.mean(DLP_LF))
+                
+            compare_results[col + n_vc].append([np.mean(DLPDAVN_rev_diff), np.mean(DLPDAVN_LF_diff), DLPDAVN_time])
+        table_data.append(compare_results)
+            
+    print(pandas.DataFrame(table_data,  columns = col_titles))
+    return table_data
+    
+result = DAVN_compare_n_vc(3, 3, 3, 30, 2, 10)
 
 
 # In[ ]:

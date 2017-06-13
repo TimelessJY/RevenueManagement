@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[4]:
+# In[15]:
 
 import warnings
 import numpy as np
@@ -17,7 +17,7 @@ import RM_demand_model
 import pulp
 
 
-# In[31]:
+# In[16]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -108,7 +108,7 @@ d = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[6]:
+# In[17]:
 
 ##############################
 ###### Single_DCM ############
@@ -307,7 +307,7 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[74]:
+# In[18]:
 
 ##############################
 ###### network_DAVN ##########
@@ -653,7 +653,7 @@ class Network_DAVN():
 # # print(davn_prob.disp_adjusted_revs)
 
 
-# In[70]:
+# In[19]:
 
 ##############################
 ###### Network_DLP approach   ########
@@ -724,15 +724,15 @@ class Network_DLP():
 # print(problem.get_obj_value([2,4], 0), problem.get_bid_prices([2,4], 0))
 
 
-# In[78]:
+# In[41]:
 
 #####################################
 ###### Network_DLP with DAVN ########
 #####################################
 
-# Implement a control strategy, which at each time period, compute Network_DLP to get static bid-prices for resources, and then
-# feed them to DAVN method to get booking limits for virtual classes on each resource. Use these booking limits to 
-# controls actual sales.
+# Implement a control strategy, which at each time period, compute Network_DLP to get static bid-prices for resources, 
+# and then feed them to DAVN method to get booking limits for virtual classes on each resource. Use these booking 
+# limits to controls actual sales.
 # Assume that products are given in descending order of their revenue.
 class DLP_DAVN():
     def __init__(self, products, resources, capacities, total_time, n_virtual_class, demand_model):
@@ -752,6 +752,7 @@ class DLP_DAVN():
         davn_result = self.DAVN_model.calc_value_function(initial_static_price, capacities, 0)
         self.booking_limits = davn_result[1]
         self.indexing_scheme = davn_result[3]
+        self.sold_cap = [[0] * len(i) for i in self.booking_limits]
 #         print("booking limits: ", self.booking_limits)
 #         print("indexing scheme: ", self.indexing_scheme)
         
@@ -775,7 +776,7 @@ class DLP_DAVN():
                     for i in range(self.n_resources):
                         if incidence_vector[i] == 1:
                             virtual_class = self.indexing_scheme[i][product_name]
-                            if self.booking_limits[i][virtual_class] == 0:
+                            if self.sold_cap[i][virtual_class] == self.booking_limits[i][virtual_class]:
                                 willing_to_sell = False
                                 break
                     
@@ -785,9 +786,9 @@ class DLP_DAVN():
                         for i in range(self.n_resources):
                             if incidence_vector[i] == 1:
                                 virtual_class = self.indexing_scheme[i][product_name]
-                                self.booking_limits[i][virtual_class] -= 1
-#                         print("t= ", t, " request = ", product_name, " sell, bookinglimits=", self.booking_limits)
-
+                                for vc in range(virtual_class, len(self.booking_limits[i])):
+                                    self.sold_cap[i][vc] += 1
+    
         consumed = [r / c for r, c in zip(remain_cap, self.capacities)]
         load_factor = (1 - np.mean(consumed)) * 100
         return total_revs, load_factor
@@ -799,7 +800,7 @@ class DLP_DAVN():
 # ps = RM_helper.sort_product_revenues(p)
 # T = 10
 # dm = RM_demand_model.model(ar, T, 1)
-# problem = DLP_DAVN(ps, r, c, T, 2, dm)
+# problem = DLP_DAVN(ps, r, c, T, 3, dm)
 # problem.performance()
 
 

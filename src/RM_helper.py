@@ -1,11 +1,12 @@
 
 # coding: utf-8
 
-# In[87]:
+# In[93]:
 
 import numpy as np
 import time
 import random
+import bisect
 
 
 # In[88]:
