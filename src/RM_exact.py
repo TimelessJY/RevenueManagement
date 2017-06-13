@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[3]:
+# In[17]:
 
 import warnings
 import numpy as np
@@ -14,6 +14,7 @@ import sys
 sys.path.append('.')
 import RM_helper
 import RM_demand_model
+import RM_evaluator
 
 
 # In[13]:
@@ -151,7 +152,7 @@ cap = 80
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[1]:
+# In[18]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -267,15 +268,16 @@ class Single_RM_dynamic():
                         break
         return self.protection_levels
 
-products = [1, 30], [2, 25], [3, 12], [4, 4]
-arrival_rates = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
-# problem = Single_RM_dynamic(products, arrival_rates, 3,3)
+# p = [[1, 1050], [2,567], [3, 534], [4,520]]
+# T = 10
+# ar = [RM_evaluator.sample_random_probs(4, 0.8) for i in range(T)]
+# problem = Single_RM_dynamic(p, ar, 10, 10)
 # print(problem.calc_value_func())
-# problem.get_protection_levels()
-# problem.get_bid_prices()
+# print(problem.get_protection_levels())
+# print(problem.get_bid_prices())
 
 
-# In[10]:
+# In[19]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -425,18 +427,18 @@ class Network_RM():
         
         return self.value_functions[0][-1]
 
-start_time = time.time()
-p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
-r = ['a', 'b']
-c = [3,5]
-ar = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
-ps = RM_helper.sort_product_revenues(p)
-T = 10
-dm = RM_demand_model.model(ar, T, 1)
-problem = Network_RM(ps, r, c, T, dm)
-print(problem.calc_value_func())
+# start_time = time.time()
+# p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
+# r = ['a', 'b']
+# c = [3,5]
+# ar = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+# ps = RM_helper.sort_product_revenues(p)
+# T = 10
+# dm = RM_demand_model.model(ar, T, 1)
+# problem = Network_RM(ps, r, c, T, dm)
+# print(problem.calc_value_func())
 # print(problem.get_bid_prices())
-print("--- %s seconds ---" % (time.time() - start_time))
+# print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # In[ ]:
