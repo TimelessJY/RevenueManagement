@@ -1,17 +1,14 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[87]:
 
 import numpy as np
 import time
 import random
-import bisect
-import networkx as nx
-import matplotlib.pyplot as plt
 
 
-# In[6]:
+# In[88]:
 
 def sort_product_demands(products):
     """
@@ -66,7 +63,7 @@ def calc_incidence_matrix(products, resources):
     return incidence_matrix
 
 
-# In[3]:
+# In[89]:
 
 def state_index(n_states, capacities, remain_cap):
     """converts the given array of remaining capacities into the state number"""
@@ -81,17 +78,24 @@ def state_index(n_states, capacities, remain_cap):
     capacity_for_others = n_states
 
     for i in range(len(capacities)):
+        cap_i = remain_cap[i]
+        if cap_i > capacities[i] or cap_i < 0: 
+            raise ValueError('RM_helper: state_index(), Error with given remaining capacity')
         capacity_for_others /= capacities[i] + 1
-        state_num += remain_cap[i] * capacity_for_others
+        state_num += cap_i * capacity_for_others
     return int(state_num)
         
 def remain_cap(n_states, capacities, state_number):
     """reverse of function state_number(), to convert the given state number into remained capacities"""
     """e.g. given total capacities [1,2,3] and state_number 5, should return [0, 2, 1]"""
-
+    
+    if n_states == 0:
+        n_states = 1
+        for c in capacities:
+            n_states *= (c + 1)
+        
     if state_number >= n_states:
-        raise RuntimeError(
-            'Error when converting state number to remained capacities; given state number is too large.')
+        raise RuntimeError('RM_helper: remain_cap(), Error when converting state number to remained capacities;             given state number is too large.')
 
     remain_cap = []
     capacity_for_others = n_states
@@ -103,7 +107,7 @@ def remain_cap(n_states, capacities, state_number):
     return remain_cap
 
 
-# In[4]:
+# In[90]:
 
 def sample_network_demands(demands, total_time):
     """samples a series of index of products, whose request arrives at each period in the given total time """
@@ -133,7 +137,7 @@ def sample_single_static_demands(demands):
     return sampled_demands
 
 
-# In[9]:
+# In[91]:
 
 def network_bid_prices(value_func, products, resources, capacities, incidence_matrix, n_states):
     """Calculate the bid prices for resources at every state in every time period."""
@@ -152,31 +156,19 @@ def network_bid_prices(value_func, products, resources, capacities, incidence_ma
             bp_t_s = [None] * n_resources
             for j in range(len(products)):
                 incidence_vector = [row[j] for row in incidence_matrix]
-                if incidence_vector not in A:
-                    V_diff = value_func[t][s]
-                    remained_cap = remain_cap(n_states, capacities, s)
-                    reduced_cap = [a_i - b_i for a_i, b_i in zip(remained_cap, incidence_vector)]
-                    if all(c >= 0 for c in reduced_cap):
-                        V_diff -= value_func[t][state_index(n_states, capacities, reduced_cap)]
-                        if sum(incidence_vector) == 1:
-                            bp_t_s[incidence_vector.index(1)] = V_diff
-                    A.append(incidence_vector)
-                    b.append(V_diff)
-#             print("bp_t_s:", bp_t_s)
-            if any(bp is None for bp in bp_t_s):
-                if not A:
-                    bp_t_s = [0] * n_resources
-                elif len(A) < n_resources:
-                    bp_t_s = [0 if x is None else x for x in bp_t_s]
-                else:
-                    A_solve = A[:n_resources]
-                    b_solve = b[:n_resources]
-#                     print("A,b=", A_solve, b_solve)
-#                     bp = np.linalg.solve(A_solve, b_solve)
-                    bp, residuals, rank, singular_vals = np.linalg.lstsq(A, b)
-#                     print("result=", bp)
-                    bp_t_s = [0 if x < 0 else x for x in bp]
-
+                V_diff = value_func[t][s]
+                remained_cap = remain_cap(n_states, capacities, s)
+                reduced_cap = [a_i - b_i for a_i, b_i in zip(remained_cap, incidence_vector)]
+                if all(c >= 0 for c in reduced_cap):
+                    V_diff -= value_func[t][state_index(n_states, capacities, reduced_cap)]
+                    if sum(incidence_vector) == 1:
+                        bp_t_s[incidence_vector.index(1)] = V_diff
+                A.append(incidence_vector)
+                b.append(V_diff)
+                
+            bp, _,_,_ = np.linalg.lstsq(A, b)
+            bp_t_s = [0 if x < 0 else x for x in bp]
+            
             bid_price_t.append([round(bp_r, 3) for bp_r in bp_t_s])
         bid_prices.append(bid_price_t)
     return bid_prices

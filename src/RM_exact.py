@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[12]:
+# In[3]:
 
 import warnings
 import numpy as np
@@ -65,12 +65,12 @@ class Single_RM_static():
         self.bid_prices = []
         # Check that the data of demands is specified for each product
         if len(demands) != self.n_products:
-            raise ValueError('Size of demands is not as expected.')
+            raise ValueError('RM_exact: Single_RM_static init(), Size of demands is not as expected.')
         
         # Make sure the products are sorted in descending order based on their revenues
         for j in range(self.n_products-1):
             if products[j][1] < products[j+1][1]:
-                raise ValueError('The products are not in the descending order of their revenues.')
+                raise ValueError('RM_exact: Single_RM_static init(), The products are not in the descending order of                 their revenues.')
         
     def calc_value_func(self):
         """Calculate the value functions of this problem and the protection levels for the products."""
@@ -109,9 +109,6 @@ class Single_RM_static():
             self.protection_levels[-1] = self.capacity
             
         return self.value_functions
-#         print("Expected revenue=", self.value_functions[self.n_products-1][self.capacity])
-#         print(self.value_functions)
-#         print(self.protection_levels)
 
     def get_bid_prices(self):
         if not self.value_functions:
@@ -154,7 +151,7 @@ cap = 80
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[15]:
+# In[1]:
 
 ##############################
 ###### Single_RM DP ##########
@@ -209,16 +206,16 @@ class Single_RM_dynamic():
         
         # Check that the sequence of arrival_rates is specified for each time period
         if self.n_arrival_rates_periods > 1 and (len(arrival_rates) != total_time or                                                  len(arrival_rates[0]) != self.n_products):
-            raise ValueError('Size of arrival_rates is not as expected.')
+            raise ValueError('RM_exact: Single_RM_dynamic init(), Size of arrival_rates is not as expected.')
         
         # Important assumption: at most one demand will occur in each time period
         if ((self.n_arrival_rates_periods == 1) and (sum(arrival_rates[0]) > 1))             or ((self.n_arrival_rates_periods > 1) and any(sum(arrival_rates[t]) > 1 for t in range(total_time))):
-                raise ValueError('There may be more than 1 demand arriving.')
+                raise ValueError('RM_exact: Single_RM_dynamic init(), There may be more than 1 demand arriving.')
         
         # Make sure the products are sorted in descending order based on their revenues
         for j in range(self.n_products-1):
             if products[j][1] < products[j+1][1]:
-                raise ValueError('The products are not in the descending order of their revenues.')
+                raise ValueError('RM_exact: Single_RM_dynamic init(), The products are not in the descending order of                 their revenues.')
         
     def calc_value_func(self):
         """Calculate the value functions of this problem backwards from the last time period to the beginning."""
@@ -272,13 +269,13 @@ class Single_RM_dynamic():
 
 products = [1, 30], [2, 25], [3, 12], [4, 4]
 arrival_rates = [[0, 0.2, 0, 0.7], [0.2, 0.1, 0, 0.5], [0.1, 0.3, 0.1,0.1]]
-problem = Single_RM_dynamic(products, arrival_rates, 3,3)
+# problem = Single_RM_dynamic(products, arrival_rates, 3,3)
 # print(problem.calc_value_func())
 # problem.get_protection_levels()
 # problem.get_bid_prices()
 
 
-# In[16]:
+# In[10]:
 
 ##############################
 ###### Network_RM DP ######### 
@@ -333,12 +330,12 @@ class Network_RM():
         
         # Check that the capacity for each resource is given
         if len(capacities) != self.n_resources:
-            raise ValueError('Number of capacities for resources is not correct.')
+            raise ValueError('RM_exact: Network_RM init(), Number of capacities for resources is not correct.')
         
         # Make sure the products are sorted in descending order based on their revenues
         for j in range(self.n_products-1):
             if products[j][1] < products[j+1][1]:
-                raise ValueError('The products are not in the descending order of their revenues.')
+                raise ValueError('RM_exact: Network_RM init(), The products are not in the descending order of their                 revenues.')
             
         self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
         self.calc_number_of_state()
@@ -428,17 +425,18 @@ class Network_RM():
         
         return self.value_functions[0][-1]
 
-# start_time = time.time()
-# p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
-# resources = ['a', 'b']
-# capacities = [3,5]
-# arrival_rates = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
-# products = RM_helper.sort_product_revenues(p)
-# T = 10
-# dm = RM_demand_model.model(arrival_rates, T, 1)
-# problem = Network_RM(products, resources, capacities, T, dm)
+start_time = time.time()
+p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
+r = ['a', 'b']
+c = [3,5]
+ar = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+ps = RM_helper.sort_product_revenues(p)
+T = 10
+dm = RM_demand_model.model(ar, T, 1)
+problem = Network_RM(ps, r, c, T, dm)
+print(problem.calc_value_func())
 # print(problem.get_bid_prices())
-# print("--- %s seconds ---" % (time.time() - start_time))
+print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # In[ ]:
