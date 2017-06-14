@@ -22,7 +22,7 @@ import RM_ADP
 import RM_demand_model
 
 
-# In[2]:
+# In[25]:
 
 PRICE_LIMITS = [150, 250] # maximum prices for flight legs in a 3-spoke or 4-spoke network
 sum_arrival_rates = [0.3, 0.45, 0.9] # sum of arrival rates for low,med,hi demand levels
@@ -44,7 +44,9 @@ def generate_network(n_spokes, demand_type, fare_class = 1):
     
     # produce single-leg itineraries
     single_legs = resources[:]
-    single_legs += reverse_itinerary(resources)
+    reversed_resource = reverse_itinerary(resources)
+    single_legs += reversed_resource
+    resources += reversed_resource
     
     # produce double-leg itineraries
     double_legs = []
@@ -153,6 +155,7 @@ def extract_legs_info(products, resources):
     return products
 
 # resources, itineraries, arrival_rates = generate_network(3, 1)
+# print("resources = ", resources)
 # extract_legs_info(itineraries, resources)
 
 
@@ -273,7 +276,7 @@ def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
 # plt.savefig('single_static_time_diff')
 
 
-# In[16]:
+# In[30]:
 
 p = 0.5
 def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
@@ -345,7 +348,7 @@ def compare_with_DP(total_num, n_spoke, cap, iterations, demand_type, n_virtual_
     print(pandas.DataFrame(table_data,  columns = col_titles))
     return table_data
     
-# result = compare_with_DP(15, 3, 3, 50, 2, 6, 40)
+result = compare_with_DP(3, 3, 3, 5, 2, 6, 40)
 
 # x = [data[-1] for data in result]
 # DLPDAVN_perf = [data[0] for data in result]
@@ -374,7 +377,7 @@ def compare_with_DP(total_num, n_spoke, cap, iterations, demand_type, n_virtual_
 # plt.savefig('rev_perf_vs_exactDP_DLPVD')
 
 
-# In[5]:
+# In[27]:
 
 # Draw the graph of running time of the network_DP model
 def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
@@ -455,16 +458,93 @@ def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
 # plt.savefig('network-DP-time-3resource')
 
 
-# In[17]:
+# In[96]:
 
 # compare different numbers of virtual classes that DAVN decomposes into, in terms of revenue performance
-def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, max_vc):
-    problems = generate_samples(total_num, n_spoke, cap, demand_type, 1)
-    col_titles = ["exact_rev", "exact_LF"]
-    n_products = len(problems[0][0])
-    max_vc = min(max_vc, n_products)
-    col_titles+= ["perf " + str(i) + "%" for i in range(1, max_vc)]
+def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, n_virtual_classes):
+    col_titles = ["rev_DLPVD", "LF_DLPVD","rev_DLPDAVN_mean %", "loadF_DLPDAVN_mean %", "DLPDAVN_time"]
     table_data = []
+    problems = generate_samples(total_num, n_spoke, cap, demand_type, 1)
+    n_vc = len(n_virtual_classes)
+    for prob in problems:
+        compare_results = [[] for _ in range(len(col_titles))]
+        for index in [2, 3, 4]:
+            compare_results[index] = [[] for _ in range(n_vc)]
+        
+        products = prob[0]
+        resources = prob[1]
+        capacities = prob[2]
+        total_time = prob[3]
+        demand_model = prob[4]
+        
+        DLPVD_model = RM_approx.DLPVD(products, resources, capacities, total_time, demand_model)
+        DLPDAVN_models = []
+        for index in range(n_vc):
+            DLPDAVN_time = time.time()
+            DLPDAVN_models.append(RM_approx.DLP_DAVN(products, resources, capacities, total_time,                                                     n_virtual_classes[index], demand_model))
+            DLPDAVN_time = time.time() - DLPDAVN_time
+            compare_results[-1][index].append(DLPDAVN_time)
+            
+        for i in range(iterations):
+            requests = demand_model.sample_network_arrival_rates()
+            DLPVD_result = DLPVD_model.performance(requests)
+            DLPVD_rev = DLPVD_result[0]
+            DLPVD_LF = DLPVD_result[1]
+            compare_results[0].append(DLPVD_rev)
+            compare_results[1].append(DLPVD_LF)
+            
+            for index in range(n_vc):
+                DLPDAVN_result = DLPDAVN_models[index].performance(requests)
+                compare_results[2][index].append((DLPDAVN_result[0] - DLPVD_rev)/DLPVD_rev * 100)
+                compare_results[3][index].append((DLPDAVN_result[1] - DLPVD_LF)/DLPVD_LF * 100)
+                
+        results = [np.mean(compare_results[0]), np.mean(compare_results[1])]
+        results += [np.mean(compare_results[2], 1)]
+        results += [np.mean(compare_results[3], 1)]
+        results.append(np.mean(compare_results[-1], 1))
+        
+        table_data.append(results)
+        
+    print(pandas.DataFrame(table_data,  columns = col_titles))
+    return table_data
+    
+VCs = [1,2,3,4]
+result = DAVN_compare_n_vc(15, 3, 3, 3, 2, VCs)
+
+markers = ['^', 'o', 'x', 's']
+
+x = [data[1] for data in result]
+DLPDAVN_perf = [data[2] for data in result]
+DLPDAVN_time = [data[4] for data in result]
+
+plt.clf()
+for i in range(len(VCs)):
+    plt.scatter(x, [item[i] for item in DLPDAVN_perf], marker = markers[i], label = 'n_vc='+ str(VCs[i]))
+plt.legend()
+plt.ylabel('Revenue Difference against DLPVD %')
+plt.xlabel('Load Factor by DLPVD % ')
+# plt.show()
+plt.savefig('DLPDAVN_VCs_rev_perf_vs_DLPVD')
+
+plt.clf()
+x = VCs[:]
+y = np.mean(DLPDAVN_time, 0)
+plt.scatter(x, y, marker = 'o')
+plt.ylabel('Running Time(s)')
+plt.xlabel('Max number of virtual classes')
+# plt.show()
+plt.savefig('DLPDAVN_VCs_time_vs_DLPVD')
+
+
+
+# In[67]:
+
+# compare performances of DLPDAVN and LPADP against DLPVD
+def compare_with_DLPVD(total_num, n_spoke, cap, iterations, demand_type, n_virtual_classes, Ks):
+    col_titles = ["rev_DLPVD", "LF_DLPVD","rev_DLPDAVN_mean %", "loadF_DLPDAVN_mean %", "rev_LPADP_mean %", 
+                  "loadF_LPADP_mean %"]
+    table_data = []
+    problems = generate_samples(total_num, n_spoke, cap, demand_type, 1)
     for prob in problems:
         compare_results = [[] for _ in range(len(col_titles))]
         
@@ -474,47 +554,154 @@ def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, max_vc):
         total_time = prob[3]
         demand_model = prob[4]
         
-        exactDP_model = RM_exact.Network_RM(products, resources, capacities, total_time, demand_model)
-        exactDP_bid_prices = exactDP_model.get_bid_prices()
-        bid_prices = [exactDP_bid_prices]
+        DLPVD_model = RM_approx.DLPVD(products, resources, capacities, total_time, demand_model)
+        DLPDAVN_models = [RM_approx.DLP_DAVN(products, resources, capacities, total_time, n_vc, demand_model)
+                          for n_vc in n_virtual_classes]
+        LPADP_model = RM_ADP.ALP(products, resources, capacities, total_time, demand_model)
+        compare_results[2] = [[] for _ in range(len(n_virtual_classes))]
+        compare_results[3] = [[] for _ in range(len(n_virtual_classes))]
+        compare_results[4] = [[] for _ in range(len(Ks))]
+        compare_results[5] = [[] for _ in range(len(Ks))]
         
-        col = 1
-        for n_vc in range(1, max_vc):
-            DLPDAVN_time = time.time()
-            DLPDAVN_model = RM_approx.DLP_DAVN(products, resources, capacities, total_time, n_vc, demand_model)
-            DLPDAVN_time = time.time() - DLPDAVN_time
+        for i in range(iterations):
+            requests = demand_model.sample_network_arrival_rates()
             
-            DLP_rev = []
-            DLP_LF = []
-            DLPDAVN_rev_diff = []
-            DLPDAVN_LF_diff = []
+            DLPVD_result = DLPVD_model.performance(requests)
+            DLPVD_rev = DLPVD_result[0]
+            DLPVD_LF = DLPVD_result[1]
             
-            for i in range(iterations):
-                requests = demand_model.sample_network_arrival_rates()
-                if n_vc == 1:
-                    eval_results = RM_compare.simulate_network_bidprices_control(bid_prices, products, resources,                                                                                  capacities, total_time, requests)
-                    exactDP_rev = eval_results[0][0]
-                    exactDP_LF = eval_results[0][1]
+            compare_results[0].append(DLPVD_rev)
+            compare_results[1].append(DLPVD_LF)
+            
+            
+            for p in range(len(n_virtual_classes)):
+                DLPDAVN_result = DLPDAVN_models[p].performance(requests)
+                compare_results[2][p].append((DLPDAVN_result[0] - DLPVD_rev)/DLPVD_rev * 100)
+                compare_results[3][p].append((DLPDAVN_result[1] - DLPVD_LF) / DLPVD_LF * 100)
+            
+            for q in range(len(Ks)):
+                LPADP_bid_prices = LPADP_model.get_bid_prices(Ks[q])
+                eval_results = RM_compare.simulate_network_bidprices_control([LPADP_bid_prices], products, resources,                                                                              capacities, total_time, requests)
 
-                    DLP_rev.append(exactDP_rev)
-                    DLP_LF.append(exactDP_LF)
-                
-                DLPDAVN_result = DLPDAVN_model.performance(requests)
-#                 print("exact_rev = ",exactDP_rev, " DLPDAVN_rev = ", DLPDAVN_result[0])
-                DLPDAVN_rev_diff.append((exactDP_rev - DLPDAVN_result[0])/exactDP_rev * 100)
-                DLPDAVN_LF_diff.append((exactDP_LF - DLPDAVN_result[1])/exactDP_LF * 100)
-                
-            if DLP_rev:
-                compare_results[0].append(np.mean(DLP_rev))
-                compare_results[1].append(np.mean(DLP_LF))
-                
-            compare_results[col + n_vc].append([np.mean(DLPDAVN_rev_diff), np.mean(DLPDAVN_LF_diff), DLPDAVN_time])
-        table_data.append(compare_results)
+                LPADP_results = eval_results[0]
+                compare_results[4][q].append((LPADP_results[0] - DLPVD_rev)/DLPVD_rev * 100)
+                compare_results[5][q].append((LPADP_results[1] - DLPVD_LF) / DLPVD_LF * 100)
+            
+        problem_result = [np.mean(result) for result in compare_results[:2]]
+        problem_result += [np.mean(result, 1) for result in compare_results[2:4]]
+        problem_result += [np.mean(result, 1) for result in compare_results[4:6]]
+        table_data.append(problem_result)
             
     print(pandas.DataFrame(table_data,  columns = col_titles))
     return table_data
     
-# result = DAVN_compare_n_vc(3, 3, 3, 30, 2, 10)
+VCs = [2, 4]
+Ks = [50, 100, 200]
+markers = ['^', 'o', 'x']
+result = compare_with_DLPVD(2, 3, 3, 2, 2, VCs, Ks)
+
+x = [data[1] for data in result]
+DLPDAVN_perf = [data[2] for data in result]
+LPADP_perf = [data[4] for data in result]
+
+plt.clf()
+for i in range(len(VCs)):
+    plt.scatter(x, [item[i] for item in DLPDAVN_perf], marker = markers[i], label = 'n_vc='+ str(VCs[i]))
+plt.legend()
+plt.ylabel('Revenue Difference against exactDP %')
+plt.xlabel('Load Factor by DLPVD % ')
+# plt.show()
+plt.savefig('rev_perf_vs_DLPVD_DLPDAVN')
+
+plt.clf()
+for i in range(len(Ks)):
+    plt.scatter(x, [item[i] for item in LPADP_perf], marker = markers[i], label = 'K='+ str(Ks[i]))
+plt.legend()
+plt.ylabel('Revenue Difference against exactDP %')
+plt.xlabel('Load Factor by DLPVD % ')
+# plt.show()
+plt.savefig('rev_perf_vs_DLPVD_LPADP')
+
+
+# In[94]:
+
+# compare different numbers of states that LPADP samples to obtain conditions, in terms of revenue performance
+def LPADP_compare_K(total_num, n_spoke, cap, iterations, demand_type, Ks):
+    col_titles = ["rev_DLPVD", "LF_DLPVD","rev_LPADP_mean %", "loadF_LPADP_mean %", "LPADP_time"]
+    table_data = []
+    problems = generate_samples(total_num, n_spoke, cap, demand_type, 1)
+    n_Ks = len(Ks)
+    for prob in problems:
+        compare_results = [[] for _ in range(len(col_titles))]
+        for index in [2, 3, 4]:
+            compare_results[index] = [[] for _ in range(n_Ks)]
+        
+        products = prob[0]
+        resources = prob[1]
+        capacities = prob[2]
+        total_time = prob[3]
+        demand_model = prob[4]
+        
+        LPADP_model = RM_ADP.ALP(products, resources, capacities, total_time, demand_model)
+        LPADP_bid_prices = []
+        DLPVD_model = RM_approx.DLPVD(products, resources, capacities, total_time, demand_model)
+        
+        for index in range(n_Ks):
+            LPADP_time = time.time()
+            LPADP_bid_prices.append(LPADP_model.get_bid_prices(Ks[index]))
+            LPADP_time = time.time() - LPADP_time
+            
+            compare_results[-1][index].append(LPADP_time)
+            
+        for i in range(iterations):
+            requests = demand_model.sample_network_arrival_rates()
+            DLPVD_result = DLPVD_model.performance(requests)
+            DLPVD_rev = DLPVD_result[0]
+            DLPVD_LF = DLPVD_result[1]
+            compare_results[0].append(DLPVD_rev)
+            compare_results[1].append(DLPVD_LF)
+            
+            eval_results = RM_compare.simulate_network_bidprices_control(LPADP_bid_prices, products, resources,                                                                          capacities, total_time, requests)
+            for index in range(n_Ks):
+                compare_results[2][index].append((eval_results[index][0] - DLPVD_rev)/ DLPVD_rev * 100)
+                compare_results[3][index].append((eval_results[index][1] - DLPVD_LF)/ DLPVD_LF * 100)
+                
+        results = [np.mean(compare_results[0]), np.mean(compare_results[1])]
+        results += [np.mean(compare_results[2], 1)]
+        results += [np.mean(compare_results[3], 1)]
+        results.append(np.mean(compare_results[-1], 1))
+        
+        table_data.append(results)
+            
+    print(pandas.DataFrame(table_data,  columns = col_titles))
+    return table_data
+    
+Ks = [10, 50, 100, 150, 200]
+result = LPADP_compare_K(3, 3, 3, 3, 2, Ks)
+
+markers = ['^', 'o', 'x']
+
+x = [data[1] for data in result]
+LPADP_perf = [data[2] for data in result]
+LPADP_time = [data[4] for data in result]
+
+plt.clf()
+for i in range(len(Ks)):
+    plt.scatter(x, [item[i] for item in LPADP_perf], marker = markers[i], label = 'K='+ str(Ks[i]))
+plt.legend()
+plt.ylabel('Revenue Difference against DLPVD %')
+plt.xlabel('Load Factor by DLPVD % ')
+# plt.show()
+plt.savefig('LPADP_Ks_rev_perf_vs_DLPVD')
+
+x = Ks[:]
+plt.clf()
+y = np.mean(LPADP_time, 0)
+plt.scatter(x, y, marker = 'o')
+plt.ylabel('Running Time(s)')
+plt.xlabel('K')
+# plt.show()
+plt.savefig('LPADP_Ks_time_vs_DLPVD')
 
 
 # In[ ]:
