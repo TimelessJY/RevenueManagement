@@ -273,7 +273,7 @@ def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
 # plt.savefig('single_static_time_diff')
 
 
-# In[4]:
+# In[16]:
 
 p = 0.5
 def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
@@ -326,26 +326,52 @@ def compare_with_DP(total_num, n_spoke, cap, iterations, demand_type, n_virtual_
             exactDP_LF = eval_results[0][1]
             
             DLPDAVN_result = DLPDAVN_model.performance(requests)
-            compare_results[0].append((exactDP_rev - DLPDAVN_result[0])/exactDP_rev)
-            compare_results[1].append((exactDP_LF - DLPDAVN_result[1]) / exactDP_LF)
+            compare_results[0].append((exactDP_rev - DLPDAVN_result[0])/exactDP_rev * 100)
+            compare_results[1].append((exactDP_LF - DLPDAVN_result[1]) / exactDP_LF * 100)
             
             LPADP_results = eval_results[1]
-            compare_results[2].append((exactDP_rev - LPADP_results[0])/exactDP_rev)
-            compare_results[3].append((exactDP_LF - LPADP_results[1]) / exactDP_LF)
+            compare_results[2].append((exactDP_rev - LPADP_results[0])/exactDP_rev * 100)
+            compare_results[3].append((exactDP_LF - LPADP_results[1]) / exactDP_LF * 100)
             
             DLPVD_result = DLPVD_model.performance(requests)
-            compare_results[4].append((exactDP_rev - DLPVD_result[0])/exactDP_rev)
-            compare_results[5].append((exactDP_LF - DLPVD_result[1]) / exactDP_LF)
+            compare_results[4].append((exactDP_rev - DLPVD_result[0])/exactDP_rev * 100)
+            compare_results[5].append((exactDP_LF - DLPVD_result[1]) / exactDP_LF * 100)
             
             compare_results[6].append(exactDP_rev)
-            compare_results[7].append(exactDP_LF / 100)
+            compare_results[7].append(exactDP_LF)
             
-        table_data.append([np.mean(result) * 100 for result in compare_results])
+        table_data.append([np.mean(result) for result in compare_results])
             
     print(pandas.DataFrame(table_data,  columns = col_titles))
     return table_data
     
-result = compare_with_DP(15, 3, 3, 50, 2, 3, 20)
+# result = compare_with_DP(15, 3, 3, 50, 2, 6, 40)
+
+# x = [data[-1] for data in result]
+# DLPDAVN_perf = [data[0] for data in result]
+# LPADP_perf = [data[2] for data in result]
+# DLPVD_perf = [data[4] for data in result]
+
+# plt.clf()
+# plt.plot(x, DLPDAVN_perf, "o")
+# plt.ylabel('Revenue Difference against exactDP %')
+# plt.xlabel('Load Factor by exact DP % ')
+# # plt.show()
+# plt.savefig('rev_perf_vs_exactDP_DLPDAVN')
+
+# plt.clf()
+# plt.plot(x, LPADP_perf, "o")
+# plt.ylabel('Revenue Difference against exactDP %')
+# plt.xlabel('Load Factor by exact DP % ')
+# # plt.show()
+# plt.savefig('rev_perf_vs_exactDP_LPADP')
+
+# plt.clf()
+# plt.plot(x, DLPVD_perf, "o")
+# plt.ylabel('Revenue Difference against exactDP %')
+# plt.xlabel('Load Factor by exact DP % ')
+# # plt.show()
+# plt.savefig('rev_perf_vs_exactDP_DLPVD')
 
 
 # In[5]:
@@ -429,7 +455,7 @@ def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
 # plt.savefig('network-DP-time-3resource')
 
 
-# In[6]:
+# In[17]:
 
 # compare different numbers of virtual classes that DAVN decomposes into, in terms of revenue performance
 def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, max_vc):
@@ -488,7 +514,7 @@ def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, max_vc):
     print(pandas.DataFrame(table_data,  columns = col_titles))
     return table_data
     
-result = DAVN_compare_n_vc(3, 3, 3, 30, 2, 10)
+# result = DAVN_compare_n_vc(3, 3, 3, 30, 2, 10)
 
 
 # In[ ]:
