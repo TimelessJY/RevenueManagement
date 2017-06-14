@@ -184,7 +184,7 @@ problem = One_state_transition(products, resources, demands, capacities, 10)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[3]:
+# In[7]:
 
 #############################################
 ###### ADP: DP with feature extraction ######
@@ -196,16 +196,16 @@ class DP_w_featureExtraction():
     approximations = []
     default_method = "separable_affine"
     
-    def __init__(self, products, resources, demands, capacities, total_time):
+    def __init__(self, products, resources, capacities, total_time, demand_model):
         
         self.products = products
         self.resources = resources
-        self.demands = demands
         self.capacities = capacities
         self.total_time = total_time
         self.n_products = len(products)
         self.n_resources = len(resources)
         self.n_demand_periods = len(demands)
+        self.demand_model = demand_model
         
         self.n_states = 1
         
@@ -268,7 +268,7 @@ class DP_w_featureExtraction():
     def eval_values(self, m_states, t):
         """helper func: calculate the value of being at the given states, at time period t"""
         values = []
-        demands_t = self.get_demands(t)
+        demands_t = self.demand_model.current_arrival_rates(t)
         for state in m_states:
             value = 0
             remain_cap = RM_helper.remain_cap(self.n_states, self.capacities, state)
@@ -327,13 +327,6 @@ class DP_w_featureExtraction():
             C = [C[r] + prod[r] for r in range(self.n_resources + 1)]
         coeff = B_inverse.dot(C)
         return (True, coeff)
-              
-    def get_demands(self, t):
-        """helper func: return the demands of fare products in time period t. """
-        if self.n_demand_periods > 1:
-            return self.demands[t]
-        else:
-            return self.demands[0]
         
     def bid_prices(self):
         """return the bid prices for resources over all time periods and all remaining capacities situations."""
@@ -348,22 +341,17 @@ class DP_w_featureExtraction():
             
         return self.approximations[0][-1]
     
-
-# ps = [['a1', 0.02, 200], ['a2', 0.06, 503], ['ab1', 0.08, 400],['ab2', 0.01, 704], ['b1', 0.05, 601], \
-#       ['b2', 0.12, 106], ['bc', 0.03, 920],['c1', 0.07, 832]]
-# products,demands, _ = RM_helper.sort_product_demands(ps)
-# demands = [demands]
+# ps = [['a1', 200, 0.02], ['a2', 503, 0.06], ['ab1', 400, 0.08],['ab2', 704, 0.01], ['ab3', 601, 0.05], \
+#       ['ab4', 106, 0.12], ['bc', 920, 0.03],['c1', 832, 0.07]]
+# products,ar, _ = RM_helper.sort_product_demands(ps)
+# arrival_rates = [ar]
+# T = 10
+# dm = RM_demand_model.model(arrival_rates, T, 1)
 # resources = ['a', 'b', 'c']
-# capacities = [8] * 3
+# capacities = [5] * 3
 
-ps = [['a1', 200, 0.02], ['a2', 503, 0.06], ['ab1', 400, 0.08],['ab2', 704, 0.01], ['ab3', 601, 0.05],       ['ab4', 106, 0.12], ['bc', 920, 0.03],['c1', 832, 0.07]]
-products,demands, _ = RM_helper.sort_product_demands(ps)
-demands = [demands]
-resources = ['a', 'b', 'c']
-capacities = [5] * 3
-
-start_time = time.time()
-problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
+# start_time = time.time()
+# problem = DP_w_featureExtraction(products, resources, capacities, T, dm)
 # vf = problem.calc_value_func()
 # print(vf)
 # print(problem.bid_prices())
@@ -371,7 +359,7 @@ problem = DP_w_featureExtraction(products, resources, demands, capacities, 10)
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[7]:
+# In[5]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -605,7 +593,7 @@ class ALP():
 # problem.get_bid_prices(10)
 
 
-# In[5]:
+# In[6]:
 
 #################################################
 ###### ADP: double-leg based decomposition ######

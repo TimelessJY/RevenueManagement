@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[15]:
+# In[42]:
 
 import warnings
 import numpy as np
@@ -307,7 +307,7 @@ def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
     return V
 
 
-# In[18]:
+# In[44]:
 
 ##############################
 ###### network_DAVN ##########
@@ -634,7 +634,7 @@ class Network_DAVN():
             self.value_functions.append(value_func)
             self.booking_limits.append(single_res_prob.get_booking_limits())
             self.bid_prices.append(single_res_prob.get_bid_prices())
-        return (self.value_functions, self.booking_limits, self.bid_prices, self.index_scheme)
+        return (self.value_functions, self.booking_limits, self.bid_prices, self.index_scheme, self.virtual_classes)
     
 # p = [['1a', 1050], ['2a',950], ['3a', 699], ['4a',520],['1b', 501], ['2b', 352], ['3b', 722], \
 #             ['1ab', 760], ['2ab', 1400]]
