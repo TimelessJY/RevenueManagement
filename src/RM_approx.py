@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[42]:
+# In[78]:
 
 import warnings
 import numpy as np
@@ -108,206 +108,78 @@ d = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[17]:
+# In[19]:
 
 ##############################
-###### Single_DCM ############
+###### Network_DLP approach   ########
 ##############################
-
-# Solves single-resource capacity control, using Discrete Choice Models.
-# ref: The Theory and Practice of Revenue Management, section 2.6.2
-
-# Identifies a list of efficient sets, given information about all possible sets of products(classes)
-# ref: section 2.6.2.4
-def efficient_sets(products, sets):
-    """
-    Parameter
-    ----------
-    products: 2D np array
-        contains products, each represented in the form of [product_name, expected_revenue], 
-        size n_products * 2
-    sets: 2D np array
-        contains sets of products, each consists of probabilities of every product
-        size n_sets * n_products
+class Network_DLP():
+    def __init__(self, products, resources, capacities, demand_model):
+        self.products = products
+        self.resources = resources
+        self.capacities = capacities
+        self.n_products = len(products)
+        self.n_resources = len(resources)
+        self.product_names = [p[0] for p in products]
+        self.prices = dict(products)
+        self.demand_model = demand_model
         
-    Returns
-    -------
-    effi_sets: 2D np array
-        contains efficient sets, each in the form of [products_name, total_probability, total_expected_revenue]
-    """
-    
-    n_products = len(products)  # number of all sets
-    n_sets = len(sets) # number of sets
-    
-    candidate_sets = []
-    
-    for s in sets:
-        total_prob = 0
-        total_rev = 0
-        set_name = ''
-        for i in range(len(s)):
-            if s[i] > 0: # i.e. the sets contains the i_th product
-                total_prob += s[i]
-                total_rev += products[i][1] * s[i]
-                set_name += products[i][0]
-        candidate_sets.append([set_name, total_prob, total_rev])
-    
-    effi_sets = []   # stores output
-    prev_effi_set = -1    # store the previous efficient set, start with empty set
-    prev_prob = 0   # store the choice probability of the previous efficient set
-    prev_revenue = 0   # store the revenue of the previous efficient set
+        self.objective_value = 0
+        self.bid_prices = []
 
-    while True:
-        next_effi_set = -1     # store the next efficient set
-        max_marginal_revenue_ratio = 0
-        has_potential_set = False
-        for i in range(n_sets):
-            if i == prev_effi_set:
-                continue
-            prob = candidate_sets[i][1]
-            revenue = candidate_sets[i][2]
-            if prob >= prev_prob and revenue >= prev_revenue:
-                has_potential_set = True
-                marginal_revenue_ratio = (revenue - prev_revenue) / (prob - prev_prob)
-                if marginal_revenue_ratio > max_marginal_revenue_ratio:
-                    next_effi_set = i
-                    max_marginal_revenue_ratio = marginal_revenue_ratio
-        if not has_potential_set:
-            # stop if there isn't any potential efficient sets
-            break
-        elif next_effi_set >= 0:    # if find a new efficient set
-            prev_effi_set = next_effi_set
-            prev_prob = candidate_sets[next_effi_set][1]
-            prev_revenue = candidate_sets[next_effi_set][2]
-            effi_sets.append(candidate_sets[next_effi_set])
+        self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
 
-
-    return effi_sets
-
-# In nested policy, once identified the efficient sets
-# can compute the objective function value to find out which efficient set is optimal for that capacity x.
-# ref: section 2.6.2.5
-def optimal_set_for_capacity(product_sets, marginal_values):
-    """
-    Parameter
-    ----------
-    product_sets: np array
-        contains product sets, each in the form of [product_name, prob, revenue], size n_product_sets
-    marginal_values: np array
-        contains expected marginal value of every capacity at time t+1, size n_capacity
-   
-    Returns
-    -------
-    optimal_set: np array
-        contains the set_index of the optimal set for capacity x, size n_capacity
-    """
-    
-    n_capacity = len(marginal_values)
-    optimal_set = []
-    n_product_sets = len(product_sets)
-    for i in range(n_capacity):
-        max_diff = 0
-        curr_opt_set = -1
-        for j in range(n_product_sets):
-            diff = product_sets[j][2] - product_sets[j][1] * marginal_values[i]
-            if diff > max_diff:
-                max_diff = diff
-                curr_opt_set = product_sets[j][0]
-        optimal_set.append(curr_opt_set)
-    return optimal_set
-
-                                
-# In nested policy, calculate the optimal protection levels for each (efficient) class, at the given time, 
-# given the result from value-function
-def SINGLE_optimal_protection_levels(product_sets, values, time):
-    """
-    Parameter
-    ----------
-    product_sets: np array
-        contains product sets, each in the form of [product_name, prob, revenue], size n_product_sets
-    value: 2D np array
-        contains the value functions, size (max_time + 1) * (total_capacity + 1)
-    time: integer
-        the discrete time point at which the optimal protection levels are requested
-    Returns
-    -------
-    protection_levels: np array
-        contains the optimal protection level for the given product sets at the given time, size n_product_sets
-    """
-
-    if not values: 
-        return 0
-    
-    total_time = len(values)
-    total_capacity = len(values[0]) - 1
-    
-    if time > total_time or time < 0:
-        return 0
-    
-    value_delta = []
-    for i in range(1, total_capacity + 1):
-        value_delta.append(values[time][i] - values[time][i-1])
-    
-    n_product_sets = len(product_sets)
-    protection_levels = []
-    for i in range(n_product_sets - 1):
-        for capacity in reversed(range(total_capacity)):
-            diff = product_sets[i][2] - product_sets[i][1] * value_delta[capacity]
-            nextDiff = product_sets[i+1][2] - product_sets[i+1][1] * value_delta[capacity]
-            if diff > nextDiff:
-                protection_levels.append(capacity + 1)
-                break
-    protection_levels.append(total_capacity)
-    return protection_levels
-
-# Calculates value functions V_t(x) for different remaining capacity, x = 0 ... C
-# using backward computations, starting from V_T(x) back to V_0(x)
-# ref: function 2.26
-def SINGLE_value_function(product_sets, total_capacity, max_time, arrival_rate):
-    """
-    Parameter
-    ----------
-    product_sets: np array
-        contains sets of products on offer, each in the form of [product_name, prob, revenue], size n_product_sets
-        where the prob(probability) and revenue are aggregated values
-    total_capacity(C): integer
-        the total capacity
-    max_time(T): integer
-        the number of time periods
-    arrival_rate: number
-        the probability of arrival of a request, assumed to be constant for all time periods
-    Returns
-    -------
-    value: 2D np array
-        contains the value functions, size (max_time + 1) * (total_capacity + 1)
-    """
-    
-    prev_V = [0] * (total_capacity + 1)
-    V = []
-    for t in range(max_time + 1):
-        curr_V = [0] * (total_capacity + 1)
-        for x in range(1, total_capacity + 1):
-            max_obj_val = np.nan 
-            delta = prev_V[x] - prev_V[x-1] # the marginal cost of capacity in the next period
-            for s in product_sets:
-                if len(s) == 0:
-                    continue
-                obj_val = s[2] - s[1] * delta # the difference between the expected revenue from offering set S, 
-                # and the revenue if a request in set S is accepted
-                if np.isnan(max_obj_val) or obj_val > max_obj_val:
-                    max_obj_val = obj_val
-            max_obj_val *= arrival_rate
-            max_obj_val += prev_V[x]
-            if np.isnan(max_obj_val):
-                max_obj_val = 0
-            curr_V[x] = round(max_obj_val, 3)
+    def get_bid_prices(self, remain_cap, curr_time):
+        """Solves a Network_DLP model, with the given remaining capacity, and the current time period; returns bid
+        prices for resources. """
+        DLP_model = pulp.LpProblem('Network_DLP model', pulp.LpMaximize)
+        y = pulp.LpVariable.dict('y_%s', self.product_names, lowBound= 0)
+        
+        # objective function
+        DLP_model += sum([self.prices[j] * y[j] for j in self.product_names])
+        
+        # constraints 1, for each resource, the sum of products of consumption py each product and the booking limit of 
+        # that product is less than the total capacity of that resource
+        constraints = []
+        for i in range(self.n_resources):
+            incidence = self.incidence_matrix[i]
+            incidence_vector = dict(zip(self.product_names, incidence))
+            cap = remain_cap[i]
+            c = sum([incidence_vector[i] * y[i] for i in self.product_names]) <= cap
+            constraints.append(c)
+            DLP_model += c, "c"+str(i)
             
-        V.insert(0, curr_V)
-        prev_V = curr_V
-    return V
+        # constraints2, every booking limit should be less than the corresponding demand
+        means = self.demand_model.current_mean_demands(curr_time)
+        means_vector = dict(zip(self.product_names, means))
+        for j in self.product_names:
+            DLP_model += y[j] <= means_vector[j]
+                  
+        DLP_model.solve()
+#         print(DLP_model)
+        
+        self.bid_prices = [c.pi for c in constraints]
+        self.objective_value = pulp.value(DLP_model.objective)
+        return self.bid_prices
+    
+    def get_obj_value(self, remain_cap, curr_time):
+        self.get_bid_prices(remain_cap, curr_time)
+        return self.objective_value
+    
+# p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
+# r = ['a', 'b']
+# c = [3,5]
+# ar = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
+# ps = RM_helper.sort_product_revenues(p)
+# T = 10
+# dm = RM_demand_model.model(ar, T, 1)
+# problem = Network_DLP(ps, r, c, dm)
+# problem.get_bid_prices([1,2], 3)
+# print(problem.get_obj_value([3,5], 0), problem.get_bid_prices([3,5], 0))
+# print(problem.get_obj_value([2,4], 0), problem.get_bid_prices([2,4], 0))
 
 
-# In[44]:
+# In[94]:
 
 ##############################
 ###### network_DAVN ##########
@@ -477,6 +349,7 @@ class Network_DAVN():
         deriviation of revenue (i.e. total within-group variation)
         ref: section 3.4.3, example 3.5
         """
+        
         self.virtual_classes = [[] for _ in range(self.n_resources)]
         self.aggregated_demands = [[] for _ in range(self.n_resources)]
         self.index_scheme = [{} for _ in range(self.n_resources)]
@@ -588,11 +461,11 @@ class Network_DAVN():
                 
             if mean_demand > 0:
                 rev /= mean_demand
-            mean_demand /= partition_indicies[p] - start_index
+#             mean_demand /= partition_indicies[p] - start_index
             
             start_index = partition_indicies[p]
             virtual_classes.append([names, round(rev, 3)])
-            demands.append((round(mean_demand, 3), round(math.sqrt(variance), 3)))
+            demands.append([round(mean_demand, 3), round(math.sqrt(variance), 3)])
             
         # sort virtual classes and demands based on descending order of revenues
         demands = [d for (v, d) in sorted(zip(virtual_classes, demands), key=lambda x:x[0][1], reverse = True)]
@@ -600,6 +473,20 @@ class Network_DAVN():
         
 #         print("indexing: ", self.index_scheme)
         return (virtual_classes, demands)
+    
+    def reaggregate_demands(self):
+        for i in range(self.n_resources):
+            demands_for_classes = [[] for _ in range(len(self.virtual_classes[i]))]
+            for name, vc in self.index_scheme[i].items():
+                prod_demand = self.demands_dict[name]
+                if not demands_for_classes[vc]:
+                    demands_for_classes[vc] = [prod_demand[0], prod_demand[1] ** 2]
+                else:
+                    demands_for_classes[vc][0] += prod_demand[0]
+                    demands_for_classes[vc][1] += prod_demand[1] ** 2
+                    
+            self.aggregated_demands[i] = [[d[0], round(math.sqrt(d[1]), 3)] for d in demands_for_classes][:]
+        return self.aggregated_demands
     
     def calc_value_function(self, static_price, remain_cap, curr_time):
         """
@@ -618,11 +505,16 @@ class Network_DAVN():
 #         print("received products, r, d = ", self.products, self.resources, self.demands)
         demands = self.demand_model.current_mean_demands_with_std(curr_time)
         self.demands_dict = dict(zip([p[0] for p in self.products], demands))
+        
         self.value_functions = []
         self.booking_limits = []
         self.bid_prices = []
-        self.calc_displacement_adjusted_revenue(static_price)
-        self.clustering()
+        
+        if not self.virtual_classes:
+            self.calc_displacement_adjusted_revenue(static_price)
+            self.clustering()
+        else:
+            self.reaggregate_demands()
         
         total_exp_rev = 0
         for i in range(self.n_resources):
@@ -653,78 +545,7 @@ class Network_DAVN():
 # # print(davn_prob.disp_adjusted_revs)
 
 
-# In[19]:
-
-##############################
-###### Network_DLP approach   ########
-##############################
-class Network_DLP():
-    def __init__(self, products, resources, capacities, demand_model):
-        self.products = products
-        self.resources = resources
-        self.capacities = capacities
-        self.n_products = len(products)
-        self.n_resources = len(resources)
-        self.product_names = [p[0] for p in products]
-        self.prices = dict(products)
-        self.demand_model = demand_model
-        
-        self.objective_value = 0
-        self.bid_prices = []
-
-        self.incidence_matrix = RM_helper.calc_incidence_matrix(products, resources)
-
-    def get_bid_prices(self, remain_cap, curr_time):
-        """Solves a Network_DLP model, with the given remaining capacity, and the current time period; returns bid
-        prices for resources. """
-        DLP_model = pulp.LpProblem('Network_DLP model', pulp.LpMaximize)
-        y = pulp.LpVariable.dict('y_%s', self.product_names, lowBound= 0)
-        
-        # objective function
-        DLP_model += sum([self.prices[j] * y[j] for j in self.product_names])
-        
-        # constraints 1, for each resource, the sum of products of consumption py each product and the booking limit of 
-        # that product is less than the total capacity of that resource
-        constraints = []
-        for i in range(self.n_resources):
-            incidence = self.incidence_matrix[i]
-            incidence_vector = dict(zip(self.product_names, incidence))
-            cap = remain_cap[i]
-            c = sum([incidence_vector[i] * y[i] for i in self.product_names]) <= cap
-            constraints.append(c)
-            DLP_model += c, "c"+str(i)
-            
-        # constraints2, every booking limit should be less than the corresponding demand
-        means = self.demand_model.current_mean_demands(curr_time)
-        means_vector = dict(zip(self.product_names, means))
-        for j in self.product_names:
-            DLP_model += y[j] <= means_vector[j]
-                  
-        DLP_model.solve()
-#         print(DLP_model)
-        
-        self.bid_prices = [c.pi for c in constraints]
-        self.objective_value = pulp.value(DLP_model.objective)
-        return self.bid_prices
-    
-    def get_obj_value(self, remain_cap, curr_time):
-        self.get_bid_prices(remain_cap, curr_time)
-        return self.objective_value
-    
-# p = [['1a', 1050], ['2a',590], ['1b', 801], ['2b', 752], ['1ab', 760,], ['2ab', 1400]]
-# r = ['a', 'b']
-# c = [3,5]
-# ar = [[0.1, 0.2, 0.05, 0.28, 0.14, 0.21]]
-# ps = RM_helper.sort_product_revenues(p)
-# T = 10
-# dm = RM_demand_model.model(ar, T, 1)
-# problem = Network_DLP(ps, r, c, dm)
-# problem.get_bid_prices([1,2], 3)
-# print(problem.get_obj_value([3,5], 0), problem.get_bid_prices([3,5], 0))
-# print(problem.get_obj_value([2,4], 0), problem.get_bid_prices([2,4], 0))
-
-
-# In[41]:
+# In[93]:
 
 #####################################
 ###### Network_DLP with DAVN ########
@@ -753,10 +574,12 @@ class DLP_DAVN():
         self.booking_limits = davn_result[1]
         self.indexing_scheme = davn_result[3]
         self.sold_cap = [[0] * len(i) for i in self.booking_limits]
+        self.accepted_requests = 0
+        self.last_time_update_control = 0
 #         print("booking limits: ", self.booking_limits)
 #         print("indexing scheme: ", self.indexing_scheme)
         
-    def performance(self, requests=[]):
+    def performance(self, requests=[], frequency = 1):
         if not requests:
             requests = self.demand_model.sample_network_arrival_rates()
         total_revs = 0
@@ -764,6 +587,12 @@ class DLP_DAVN():
 
         remain_cap = self.capacities[:]
         for t in range(self.total_time):
+            if self.accepted_requests - self.last_time_update_control == frequency:
+                initial_static_price = self.Network_DLP_model.get_bid_prices(remain_cap, t)
+                davn_result = self.DAVN_model.calc_value_function(initial_static_price, remain_cap, t)
+                self.booking_limits = davn_result[1][:]
+                self.last_time_update_control = self.accepted_requests
+                
             curr_request = requests[t]
             if curr_request < self.n_products:
                 # i.e. a request has arrived at time period t
@@ -788,6 +617,7 @@ class DLP_DAVN():
                                 virtual_class = self.indexing_scheme[i][product_name]
                                 for vc in range(virtual_class, len(self.booking_limits[i])):
                                     self.sold_cap[i][vc] += 1
+                        self.accepted_requests += 1
     
         consumed = [r / c for r, c in zip(remain_cap, self.capacities)]
         load_factor = (1 - np.mean(consumed)) * 100

@@ -14,7 +14,6 @@ import sys
 sys.path.append('.')
 import RM_helper
 import RM_demand_model
-import RM_evaluator
 
 
 # In[13]:
