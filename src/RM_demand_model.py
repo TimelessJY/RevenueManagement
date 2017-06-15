@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[38]:
+# In[1]:
 
 import random
 import numpy as np
@@ -10,7 +10,7 @@ from scipy.stats import binom
 import math
 
 
-# In[42]:
+# In[21]:
 
 class model:
     """Demand model for RM network problems, provides relative functionality.
@@ -41,6 +41,7 @@ class model:
         self.total_time = total_time
         self.change_time = int(total_time / 2)
         self.p = p
+        self.level_dictionary = {'low':1, 'med':2, 'hi':3}
         
         if any(sum(rates) > 1 for rates in arrival_rates):
             raise ValueError('Arrival rates sum over 1, there might be more than 1 command arriving.')
@@ -114,6 +115,13 @@ class model:
             fall_into = bisect.bisect(cumu_prob, rand)
             requests_index[t] = fall_into
         return requests_index
+    
+    def current_demand_mode(self, t):
+        """ returns the demand mode at the given time t. """
+        return self.level_dictionary[self.rates_levels[t]]
+    
+    def get_model_type(self):
+        return self.model_type
     
 # rates = [[0.1, 0.2, 0.3],[0.14, 0.25, 0.16], [0.17, 0.28,0.39]]
 # dm = model(rates, 10, 2, 0.5)

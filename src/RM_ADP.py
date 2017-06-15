@@ -359,7 +359,7 @@ class DP_w_featureExtraction():
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[5]:
+# In[18]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -379,6 +379,11 @@ class ALP():
         self.product_names = [p[0] for p in products]
         self.prices = dict(products)
         self.demand_model = demand_model
+        self.demand_type = demand_model.get_model_type()
+        if self.demand_type > 1:
+            self.d_models = 3
+        else:
+            self.d_models = 0 # if demand type ==1, only 1 demand mode, so set to 0 to avoid iterations for modes
         
         self.incidence_matrix = []
         self.approximations = []
@@ -464,12 +469,26 @@ class ALP():
             name_t = []
             for i in range(self.n_resources):
                 name_i = []
-                for x in range(self.capacities[i] + 1):
-                    name = '-'.join([self.resources[i], str(t), str(x)])
-                    name_i.append(name)
-                    flattened_names.append(name)
+                if self.demand_type == 1: 
+                    # index of variable name is t-i-x
+                    for x in range(self.capacities[i] + 1):
+                        name = '-'.join([self.resources[i], str(t), str(x)])
+                        name_i.append(name)
+                        flattened_names.append(name)
+                else:
+                    # index of variable name is t-i-m-x, m for demand mode
+                    for m in range(self.d_models):
+                        name_m = []
+                        for x in range(self.capacities[i] + 1):
+                            name = '-'.join([self.resources[i], str(t), str(m), str(x)])
+                            name_m.append(name)
+                            flattened_names.append(name)
+                        name_i.append(name_m)
+                    
                 name_t.append(name_i)
             names.append(name_t)
+            
+#         print("flattern name: ", flattened_names, " names = ", names)
         
         # names of variables y, total size: (number of sampled-states, i.e. K) - 1
         y_names = ['s' + str(i) for i in range(min(self.total_time - 1, len(sampled_states)))]
@@ -481,7 +500,10 @@ class ALP():
         y = pulp.LpVariable.dict('y_%s', y_names)
         
         # objective function: minimize the value approximation of the initial state
-        names_initial = [names[0][i] for i in range(self.n_resources)]
+        if self.demand_type == 1:   
+            names_initial = [names[0][i] for i in range(self.n_resources)]
+        else:
+            names_initial = [names[0][i][0] for i in range(self.n_resources)]
         flattened_names_initial = np.concatenate(names_initial, axis=0).tolist()
         
         r_initial = [r[name] for name in flattened_names_initial]
@@ -494,9 +516,13 @@ class ALP():
             for s in states_t:
                 # calculate RHS, i.e. J(s), the state with current remaining capacity and at current time period
                 basis_func_s = self.generate_basis_func(s) # basis function
-                r_s_t = [[r[name] for name in n_i] for n_i in names[t]] # weights
+                if self.demand_type == 1:  
+                    r_s_t = [[r[name] for name in n_i] for n_i in names[t]] # weights
+                else:
+                    current_d_mode = self.demand_model.current_demand_mode(t)
+                    r_s_t = [[r[name] for name in n_i[current_d_mode - 1]] for n_i in names[t]] 
                 RHS = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t)])
-
+                
                 # calculate LHS, i.e. TJ(s)
                 f_s = self.find_available_products(s) # products that can be sold, based on remaining capacities
                 LHS = 0
@@ -504,7 +530,13 @@ class ALP():
                 arrival_rates_t = self.demand_model.current_arrival_rates(t)
 
                 if t < (self.total_time - 1):
-                    r_s_t_next = [[r[name] for name in n_i] for n_i in names[t + 1]] # weights of next time periods
+                    # calculate weights of next time periods
+                    if self.demand_type == 1:  
+                        r_s_t_next = [[r[name] for name in n_i] for n_i in names[t + 1]] 
+                    else:
+                        next_d_mode = self.demand_model.current_demand_mode(t+1)
+                        r_s_t_next = [[r[name] for name in n_i[next_d_mode - 1]] for n_i in names[t + 1]]
+                        
                     # value approximation of the state with the same remaining capacity in next time period
                     J_s = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t_next)])
                     total_arrival_rate = 0
@@ -536,10 +568,17 @@ class ALP():
         for t in range(self.total_time):
             for i in range(self.n_resources):
                 var_names = names[t][i]
-                for x in range(1, self.capacities[i]):
-                    constraint = r[var_names[x]] >= r[var_names[x+1]]
-                    RLP_model += constraint
-                
+                if self.demand_type == 1:  
+                    for x in range(self.capacities[i]):
+                        constraint = r[var_names[x]] >= r[var_names[x+1]]
+                        RLP_model += constraint
+                else:
+                    for m in range(self.d_models):
+                        for x in range(self.capacities[i]):
+                            constraint = r[var_names[m][x]] >= r[var_names[m][x+1]]
+                            RLP_model += constraint
+                            
+                            
         # constraints 3, define the variables that helps eliminating the max() operations in constraints 1
         for t in range(self.total_time - 1):
                 for y_v in y_values[t]:
@@ -561,7 +600,12 @@ class ALP():
                 bid_prices_t_s = [0] * self.n_resources
                 remain_cap = RM_helper.remain_cap(self.n_states, self.capacities, s)
                 for i in range(self.n_resources):
-                    var_name = '_'.join(['r', self.resources[i], str(t), str(remain_cap[i])])
+                    if self.demand_type == 1:  
+                        var_name = '_'.join(['r', self.resources[i], str(t), str(remain_cap[i])])
+                    else:
+                        current_d_mode = self.demand_model.current_demand_mode(t)
+                        var_name = '_'.join(['r', self.resources[i], str(t), str(current_d_mode - 1),                                             str(remain_cap[i])])
+                    
                     bid_prices_t_s[i] = max(varsdict[var_name], 0)
                 bid_prices_t.append(bid_prices_t_s)
             bid_prices.append(bid_prices_t)
@@ -578,19 +622,14 @@ class ALP():
         bid_prices_collected = self.collect_bid_prices(varsdict, varsnames)
         return bid_prices_collected
 
-# products = [['A_hub_B,1', 247], ['A_hub_A,1', 236], ['B_hub_B,1', 214], ['C_hub_C,1', 179], ['B_hub_C,1', 176],\
-#             ['A_hub_B,1', 147], ['A_hub,1', 146], ['B_hub_C,1', 140], ['B_hub,1', 124], ['A_hub_C,1', 103], \
-#             ['C_hub,1', 101], ['B_hub,1', 83], ['A_hub,1', 70], ['C_hub,1', 70], ['A_hub_C,1', 50]]
-# resources  = ['A_hub', 'B_hub', 'C_hub']
-# caps =  [5, 5, 5]
-# T = 15
-# arrival_rates = [[0.00809336022330334, 0.01710070945009567, 0.020078326360033788, 0.05222523446258665, \
-#                  0.0022917983183347265, 0.05723402303384334, 0.03174537869736016, 0.013477754263534003, \
-#                  0.00797476109420122, 0.008106700861791355, 0.029476674866059958, 0.0017197658565915467, \
-#                  0.025068852291842095, 0.007361565392886562, 0.018045094827535572]]
-# dm = RM_demand_model.model(arrival_rates, T, 1)
-# problem = ALP(products, resources, caps, T, dm)
-# problem.get_bid_prices(10)
+# p = [['a1', 40],['a2', 30], ['b1', 20]]
+# r = ['a', 'b']
+# cap = [2,2]
+# T = 3
+# ar = [[0.1, 0.2, 0.1], [0.2,0.1,0.3], [0.2,0.3, 0.4]]
+# dm = RM_demand_model.model(ar, T, 2)
+# problem = ALP(p, r, cap, T, dm)
+# problem.get_bid_prices(3)
 
 
 # In[6]:
@@ -772,9 +811,4 @@ T = 3
 # problem = DLBFA(products,resources, capacities, T)
 # problem.calc_value_func()
 # problem.accept_request(2, [1] * 6, 1)
-
-
-# In[ ]:
-
-
 
