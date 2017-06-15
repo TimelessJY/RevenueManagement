@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[40]:
 
 import itertools
 import random
@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.legend_handler import HandlerLine2D
 import networkx as nx
+import math
 
 import sys
 sys.path.append('.')
@@ -22,7 +23,7 @@ import RM_ADP
 import RM_demand_model
 
 
-# In[25]:
+# In[41]:
 
 PRICE_LIMITS = [150, 250] # maximum prices for flight legs in a 3-spoke or 4-spoke network
 sum_arrival_rates = [0.3, 0.45, 0.9] # sum of arrival rates for low,med,hi demand levels
@@ -159,7 +160,7 @@ def extract_legs_info(products, resources):
 # extract_legs_info(itineraries, resources)
 
 
-# In[3]:
+# In[42]:
 
 def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
     """Compare the EMSR-b method, with single-static DP model."""
@@ -276,7 +277,7 @@ def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
 # plt.savefig('single_static_time_diff')
 
 
-# In[30]:
+# In[43]:
 
 p = 0.5
 def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
@@ -348,7 +349,7 @@ def compare_with_DP(total_num, n_spoke, cap, iterations, demand_type, n_virtual_
     print(pandas.DataFrame(table_data,  columns = col_titles))
     return table_data
     
-result = compare_with_DP(3, 3, 3, 5, 2, 6, 40)
+# result = compare_with_DP(3, 3, 3, 5, 2, 6, 40)
 
 # x = [data[-1] for data in result]
 # DLPDAVN_perf = [data[0] for data in result]
@@ -377,7 +378,7 @@ result = compare_with_DP(3, 3, 3, 5, 2, 6, 40)
 # plt.savefig('rev_perf_vs_exactDP_DLPVD')
 
 
-# In[27]:
+# In[44]:
 
 # Draw the graph of running time of the network_DP model
 def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
@@ -443,7 +444,7 @@ def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
 # plt.ylabel('Expected Revenue')
 # plt.xlabel('Resource Capacity')
 # # plt.show()
-# plt.savefig('network-DP-revs-3resource')
+# plt.savefig('pictures/network-DP-revs-3resource')
 
 # plt.clf()
 # line1, = plt.plot(x,final_result[0][1], marker='^', label='max_time='+str(T))
@@ -455,10 +456,10 @@ def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
 # plt.ylabel('Running Time(s)')
 # plt.xlabel('Resource Capacity')
 # # plt.show()
-# plt.savefig('network-DP-time-3resource')
+# plt.savefig('pictures/network-DP-time-3resource')
 
 
-# In[96]:
+# In[49]:
 
 # compare different numbers of virtual classes that DAVN decomposes into, in terms of revenue performance
 def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, n_virtual_classes):
@@ -480,21 +481,22 @@ def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, n_virtua
         DLPVD_model = RM_approx.DLPVD(products, resources, capacities, total_time, demand_model)
         DLPDAVN_models = []
         for index in range(n_vc):
-            DLPDAVN_time = time.time()
             DLPDAVN_models.append(RM_approx.DLP_DAVN(products, resources, capacities, total_time,                                                     n_virtual_classes[index], demand_model))
-            DLPDAVN_time = time.time() - DLPDAVN_time
-            compare_results[-1][index].append(DLPDAVN_time)
             
         for i in range(iterations):
             requests = demand_model.sample_network_arrival_rates()
             DLPVD_result = DLPVD_model.performance(requests)
+            
             DLPVD_rev = DLPVD_result[0]
             DLPVD_LF = DLPVD_result[1]
             compare_results[0].append(DLPVD_rev)
             compare_results[1].append(DLPVD_LF)
             
             for index in range(n_vc):
+                DLPDAVN_time = time.time()
                 DLPDAVN_result = DLPDAVN_models[index].performance(requests)
+                DLPDAVN_time = time.time() - DLPDAVN_time
+                compare_results[-1][index].append(DLPDAVN_time)
                 compare_results[2][index].append((DLPDAVN_result[0] - DLPVD_rev)/DLPVD_rev * 100)
                 compare_results[3][index].append((DLPDAVN_result[1] - DLPVD_LF)/DLPVD_LF * 100)
                 
@@ -505,26 +507,44 @@ def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, n_virtua
         
         table_data.append(results)
         
-    print(pandas.DataFrame(table_data,  columns = col_titles))
-    return table_data
+    df = pandas.DataFrame(table_data,  columns = col_titles)
+    print(df)
+    return table_data, df
     
 VCs = [1,2,3,4]
-result = DAVN_compare_n_vc(15, 3, 3, 3, 2, VCs)
-
+tim = time.time()
+result, dataframe = DAVN_compare_n_vc(10, 3, 3, 20, 1, VCs)
+print("time consumed: ", time.time() - tim)
 markers = ['^', 'o', 'x', 's']
+pic_name = ['pictures/DLPDAVN_VCs_', '_perf_vs_DLPVD, freq1, demand1,spoke3']
 
 x = [data[1] for data in result]
 DLPDAVN_perf = [data[2] for data in result]
+DLPDAVN_LF = [data[3] for data in result]
 DLPDAVN_time = [data[4] for data in result]
 
+xint = range(math.floor(min(x)) - 3, math.ceil(max(x))+ 3)
 plt.clf()
 for i in range(len(VCs)):
-    plt.scatter(x, [item[i] for item in DLPDAVN_perf], marker = markers[i], label = 'n_vc='+ str(VCs[i]))
+    plt.scatter(x, [item[i] for item in DLPDAVN_perf], marker = markers[i], label = 'vc='+ str(VCs[i]))
 plt.legend()
 plt.ylabel('Revenue Difference against DLPVD %')
 plt.xlabel('Load Factor by DLPVD % ')
+plt.xticks(xint)
+plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
-plt.savefig('DLPDAVN_VCs_rev_perf_vs_DLPVD')
+plt.savefig(''.join([pic_name[0], 'rev', pic_name[1]]))
+
+plt.clf()
+for i in range(len(VCs)):
+    plt.scatter(x, [item[i] for item in DLPDAVN_LF], marker = markers[i], label = 'vc='+ str(VCs[i]))
+plt.legend()
+plt.ylabel('Load Factor Difference against DLPVD %')
+plt.xlabel('Load Factor by DLPVD % ')
+plt.xticks(xint)
+plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
+# plt.show()
+plt.savefig(''.join([pic_name[0], 'LF', pic_name[1]]))
 
 plt.clf()
 x = VCs[:]
@@ -533,11 +553,13 @@ plt.scatter(x, y, marker = 'o')
 plt.ylabel('Running Time(s)')
 plt.xlabel('Max number of virtual classes')
 # plt.show()
-plt.savefig('DLPDAVN_VCs_time_vs_DLPVD')
+plt.savefig(''.join([pic_name[0], 'time', pic_name[1]]))
+
+file_name = 'csv-files/DLPDAVN_VCs_performance.csv'
+dataframe.to_csv(file_name, sep='\t')
 
 
-
-# In[67]:
+# In[52]:
 
 # compare performances of DLPDAVN and LPADP against DLPVD
 def compare_with_DLPVD(total_num, n_spoke, cap, iterations, demand_type, n_virtual_classes, Ks):
@@ -592,26 +614,33 @@ def compare_with_DLPVD(total_num, n_spoke, cap, iterations, demand_type, n_virtu
         problem_result += [np.mean(result, 1) for result in compare_results[4:6]]
         table_data.append(problem_result)
             
-    print(pandas.DataFrame(table_data,  columns = col_titles))
-    return table_data
+    df = pandas.DataFrame(table_data,  columns = col_titles)
+    print(df)
+    return table_data, df
     
 VCs = [2, 4]
 Ks = [50, 100, 200]
 markers = ['^', 'o', 'x']
-result = compare_with_DLPVD(2, 3, 3, 2, 2, VCs, Ks)
+tim = time.time()
+result, dataframe = compare_with_DLPVD(1, 3, 3, 1, 1, VCs, Ks)
 
+pic_name = ['pictures/rev_perf_vs_DLPVD_', ', demand1, spoke3']
 x = [data[1] for data in result]
 DLPDAVN_perf = [data[2] for data in result]
 LPADP_perf = [data[4] for data in result]
 
+xint = range(math.floor(min(x)) - 3, math.ceil(max(x))+ 3)
+
 plt.clf()
 for i in range(len(VCs)):
-    plt.scatter(x, [item[i] for item in DLPDAVN_perf], marker = markers[i], label = 'n_vc='+ str(VCs[i]))
+    plt.scatter(x, [item[i] for item in DLPDAVN_perf], marker = markers[i], label = 'vc='+ str(VCs[i]))
 plt.legend()
 plt.ylabel('Revenue Difference against exactDP %')
 plt.xlabel('Load Factor by DLPVD % ')
+plt.xticks(xint)
+plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
-plt.savefig('rev_perf_vs_DLPVD_DLPDAVN')
+plt.savefig(''.join([pic_name[0], 'DLPDAVN', pic_name[1]]))
 
 plt.clf()
 for i in range(len(Ks)):
@@ -619,11 +648,16 @@ for i in range(len(Ks)):
 plt.legend()
 plt.ylabel('Revenue Difference against exactDP %')
 plt.xlabel('Load Factor by DLPVD % ')
+plt.xticks(xint)
+plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
-plt.savefig('rev_perf_vs_DLPVD_LPADP')
+plt.savefig(''.join([pic_name[0], 'LPADP', pic_name[1]]))
+
+file_name = 'csv-files/perf_against_DLPVD.csv'
+dataframe.to_csv(file_name, sep='\t')
 
 
-# In[94]:
+# In[55]:
 
 # compare different numbers of states that LPADP samples to obtain conditions, in terms of revenue performance
 def LPADP_compare_K(total_num, n_spoke, cap, iterations, demand_type, Ks):
@@ -673,26 +707,44 @@ def LPADP_compare_K(total_num, n_spoke, cap, iterations, demand_type, Ks):
         
         table_data.append(results)
             
-    print(pandas.DataFrame(table_data,  columns = col_titles))
-    return table_data
+    df = pandas.DataFrame(table_data,  columns = col_titles)
+    print(df)
+    return table_data, df
     
 Ks = [10, 50, 100, 150, 200]
-result = LPADP_compare_K(3, 3, 3, 3, 2, Ks)
+tim = time.time()
+result, dataframe = LPADP_compare_K(1, 3, 3, 2, 2, Ks)
+print("consumed time: ", time.time() - tim)
 
-markers = ['^', 'o', 'x']
-
+markers = ['^', 'o', 'x', 's', 'd']
+pic_name = ['pictures/LPADP_Ks_', '_perf_vs_DLPVD']
 x = [data[1] for data in result]
 LPADP_perf = [data[2] for data in result]
+LPADP_LF = [data[3] for data in result]
 LPADP_time = [data[4] for data in result]
 
+xint = range(math.floor(min(x)) - 3, math.ceil(max(x))+ 3)
 plt.clf()
 for i in range(len(Ks)):
     plt.scatter(x, [item[i] for item in LPADP_perf], marker = markers[i], label = 'K='+ str(Ks[i]))
 plt.legend()
 plt.ylabel('Revenue Difference against DLPVD %')
 plt.xlabel('Load Factor by DLPVD % ')
+plt.xticks(xint)
+plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
-plt.savefig('LPADP_Ks_rev_perf_vs_DLPVD')
+plt.savefig(''.join([pic_name[0], 'rev', pic_name[1]]))
+
+plt.clf()
+for i in range(len(Ks)):
+    plt.scatter(x, [item[i] for item in LPADP_LF], marker = markers[i], label = 'K='+ str(Ks[i]))
+plt.legend()
+plt.ylabel('Load Factor Difference against DLPVD %')
+plt.xlabel('Load Factor by DLPVD % ')
+plt.xticks(xint)
+plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
+# plt.show()
+plt.savefig(''.join([pic_name[0], 'LF', pic_name[1]]))
 
 x = Ks[:]
 plt.clf()
@@ -700,8 +752,13 @@ y = np.mean(LPADP_time, 0)
 plt.scatter(x, y, marker = 'o')
 plt.ylabel('Running Time(s)')
 plt.xlabel('K')
+plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
-plt.savefig('LPADP_Ks_time_vs_DLPVD')
+plt.savefig(''.join([pic_name[0], 'time', pic_name[1]]))
+
+
+file_name = 'csv-files/LPADP_Ks_performance.csv'
+dataframe.to_csv(file_name, sep='\t')
 
 
 # In[ ]:

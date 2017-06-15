@@ -179,7 +179,7 @@ class Network_DLP():
 # print(problem.get_obj_value([2,4], 0), problem.get_bid_prices([2,4], 0))
 
 
-# In[94]:
+# In[99]:
 
 ##############################
 ###### network_DAVN ##########
@@ -545,7 +545,7 @@ class Network_DAVN():
 # # print(davn_prob.disp_adjusted_revs)
 
 
-# In[93]:
+# In[103]:
 
 #####################################
 ###### Network_DLP with DAVN ########
@@ -568,29 +568,31 @@ class DLP_DAVN():
         self.Network_DLP_model = Network_DLP(products, resources, capacities, demand_model)
         self.DAVN_model = Network_DAVN(products, resources, capacities, n_virtual_class, demand_model)
         
+    def optimize(self, remain_cap, t):
         # use DLP model to get initial static prices for resources, then use DAVN to get booking limits
-        initial_static_price = self.Network_DLP_model.get_bid_prices(capacities, 0)
-        davn_result = self.DAVN_model.calc_value_function(initial_static_price, capacities, 0)
+        initial_static_price = self.Network_DLP_model.get_bid_prices(remain_cap, t)
+        davn_result = self.DAVN_model.calc_value_function(initial_static_price, remain_cap, t)
         self.booking_limits = davn_result[1]
         self.indexing_scheme = davn_result[3]
+        
+    def performance(self, requests=[], frequency = 1):        
+        # initialize the control policy
+        remain_cap = self.capacities[:]
+        self.optimize(remain_cap, 0)
         self.sold_cap = [[0] * len(i) for i in self.booking_limits]
         self.accepted_requests = 0
         self.last_time_update_control = 0
 #         print("booking limits: ", self.booking_limits)
 #         print("indexing scheme: ", self.indexing_scheme)
-        
-    def performance(self, requests=[], frequency = 1):
+
         if not requests:
             requests = self.demand_model.sample_network_arrival_rates()
         total_revs = 0
         load_factor = 0
 
-        remain_cap = self.capacities[:]
         for t in range(self.total_time):
             if self.accepted_requests - self.last_time_update_control == frequency:
-                initial_static_price = self.Network_DLP_model.get_bid_prices(remain_cap, t)
-                davn_result = self.DAVN_model.calc_value_function(initial_static_price, remain_cap, t)
-                self.booking_limits = davn_result[1][:]
+                self.optimize(remain_cap, t)
                 self.last_time_update_control = self.accepted_requests
                 
             curr_request = requests[t]
