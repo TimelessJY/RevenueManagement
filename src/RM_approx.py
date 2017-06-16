@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[78]:
+# In[1]:
 
 import warnings
 import numpy as np
@@ -179,7 +179,7 @@ class Network_DLP():
 # print(problem.get_obj_value([2,4], 0), problem.get_bid_prices([2,4], 0))
 
 
-# In[99]:
+# In[2]:
 
 ##############################
 ###### network_DAVN ##########
@@ -461,6 +461,8 @@ class Network_DAVN():
                 
             if mean_demand > 0:
                 rev /= mean_demand
+            else:
+                rev = 0
 #             mean_demand /= partition_indicies[p] - start_index
             
             start_index = partition_indicies[p]

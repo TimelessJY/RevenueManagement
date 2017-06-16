@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[40]:
+# In[1]:
 
 import itertools
 import random
@@ -23,7 +23,7 @@ import RM_ADP
 import RM_demand_model
 
 
-# In[41]:
+# In[2]:
 
 PRICE_LIMITS = [150, 250] # maximum prices for flight legs in a 3-spoke or 4-spoke network
 sum_arrival_rates = [0.3, 0.45, 0.9] # sum of arrival rates for low,med,hi demand levels
@@ -160,7 +160,7 @@ def extract_legs_info(products, resources):
 # extract_legs_info(itineraries, resources)
 
 
-# In[42]:
+# In[3]:
 
 def compare_EMSR_b_with_exact_single_static(pros, cap, iterations):
     """Compare the EMSR-b method, with single-static DP model."""
@@ -277,7 +277,7 @@ def visualize_perf_EMSR_b(products, cap_lb, cap_ub, cap_interval, iterations):
 # plt.savefig('single_static_time_diff')
 
 
-# In[43]:
+# In[4]:
 
 p = 0.5
 def generate_samples(total_num, n_spoke, cap, demand_type, n_fare_class):
@@ -378,7 +378,7 @@ def compare_with_DP(total_num, n_spoke, cap, iterations, demand_type, n_virtual_
 # plt.savefig('rev_perf_vs_exactDP_DLPVD')
 
 
-# In[44]:
+# In[5]:
 
 # Draw the graph of running time of the network_DP model
 def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
@@ -459,7 +459,7 @@ def eval_networkDP_runningTime(products, resources, cap_lb, cap_ub, total_time):
 # plt.savefig('pictures/network-DP-time-3resource')
 
 
-# In[49]:
+# In[6]:
 
 # compare different numbers of virtual classes that DAVN decomposes into, in terms of revenue performance
 def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, n_virtual_classes):
@@ -513,7 +513,7 @@ def DAVN_compare_n_vc(total_num, n_spoke, cap, iterations, demand_type, n_virtua
     
 VCs = [1,2,3,4]
 tim = time.time()
-result, dataframe = DAVN_compare_n_vc(10, 3, 3, 20, 1, VCs)
+result, dataframe = DAVN_compare_n_vc(20, 3, 3, 20, 2, VCs)
 print("time consumed: ", time.time() - tim)
 markers = ['^', 'o', 'x', 's']
 pic_name = ['pictures/DLPDAVN_VCs_', '_perf_vs_DLPVD, freq1, demand1,spoke3']
@@ -530,7 +530,7 @@ for i in range(len(VCs)):
 plt.legend()
 plt.ylabel('Revenue Difference against DLPVD %')
 plt.xlabel('Load Factor by DLPVD % ')
-plt.xticks(xint)
+# plt.xticks(xint)
 plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
 plt.savefig(''.join([pic_name[0], 'rev', pic_name[1]]))
@@ -541,7 +541,7 @@ for i in range(len(VCs)):
 plt.legend()
 plt.ylabel('Load Factor Difference against DLPVD %')
 plt.xlabel('Load Factor by DLPVD % ')
-plt.xticks(xint)
+# plt.xticks(xint)
 plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
 plt.savefig(''.join([pic_name[0], 'LF', pic_name[1]]))
@@ -637,7 +637,7 @@ for i in range(len(VCs)):
 plt.legend()
 plt.ylabel('Revenue Difference against exactDP %')
 plt.xlabel('Load Factor by DLPVD % ')
-plt.xticks(xint)
+# plt.xticks(xint)
 plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
 plt.savefig(''.join([pic_name[0], 'DLPDAVN', pic_name[1]]))
@@ -648,7 +648,7 @@ for i in range(len(Ks)):
 plt.legend()
 plt.ylabel('Revenue Difference against exactDP %')
 plt.xlabel('Load Factor by DLPVD % ')
-plt.xticks(xint)
+# plt.xticks(xint)
 plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
 plt.savefig(''.join([pic_name[0], 'LPADP', pic_name[1]]))
@@ -730,7 +730,7 @@ for i in range(len(Ks)):
 plt.legend()
 plt.ylabel('Revenue Difference against DLPVD %')
 plt.xlabel('Load Factor by DLPVD % ')
-plt.xticks(xint)
+# plt.xticks(xint)
 plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
 plt.savefig(''.join([pic_name[0], 'rev', pic_name[1]]))
@@ -741,7 +741,7 @@ for i in range(len(Ks)):
 plt.legend()
 plt.ylabel('Load Factor Difference against DLPVD %')
 plt.xlabel('Load Factor by DLPVD % ')
-plt.xticks(xint)
+# plt.xticks(xint)
 plt.ylim(plt.ylim()[0] - 3, plt.ylim()[1] + 3)
 # plt.show()
 plt.savefig(''.join([pic_name[0], 'LF', pic_name[1]]))
