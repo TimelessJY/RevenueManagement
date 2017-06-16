@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[4]:
 
 import warnings
 import numpy as np
@@ -17,7 +17,7 @@ import RM_demand_model
 import pulp
 
 
-# In[16]:
+# In[5]:
 
 ##############################
 ###### Single_EMSR ###########
@@ -108,7 +108,7 @@ d = [(17.3, 5.8), (45.1, 15.0), (39.6, 13.2), (34.0, 11.3)]
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[19]:
+# In[6]:
 
 ##############################
 ###### Network_DLP approach   ########
@@ -179,7 +179,7 @@ class Network_DLP():
 # print(problem.get_obj_value([2,4], 0), problem.get_bid_prices([2,4], 0))
 
 
-# In[2]:
+# In[7]:
 
 ##############################
 ###### network_DAVN ##########
@@ -547,7 +547,7 @@ class Network_DAVN():
 # # print(davn_prob.disp_adjusted_revs)
 
 
-# In[103]:
+# In[8]:
 
 #####################################
 ###### Network_DLP with DAVN ########
@@ -638,7 +638,7 @@ class DLP_DAVN():
 # problem.performance()
 
 
-# In[ ]:
+# In[10]:
 
 #########################################
 ###### DLP with value difference ########
@@ -677,11 +677,15 @@ class DLPVD():
                 remain_cap_if_sell = [c - x for c,x in zip(remain_cap, incidence_vector)]
                 if all(x >= 0 for x in remain_cap_if_sell):
                     # only sell if there are enough capacities of required resources
-                    value_before_sell = self.Network_DLP_model.get_obj_value(remain_cap, t)
-                    value_after_sell = self.Network_DLP_model.get_obj_value(remain_cap_if_sell, t)
+                    if t < self.total_time - 1:
+                        value_before_sell = self.Network_DLP_model.get_obj_value(remain_cap, t)
+                        value_after_sell = self.Network_DLP_model.get_obj_value(remain_cap_if_sell, t)
+                        displacement_cost = value_before_sell - value_after_sell
+                    else:
+                        displacement_cost = 0
                     
                     rev = self.products[curr_request][1]
-                    if rev >= (value_before_sell - value_after_sell):
+                    if rev >= (displacement_cost):
                         # willing to sell
                         total_revs += rev
                         remain_cap = remain_cap_if_sell[:]
