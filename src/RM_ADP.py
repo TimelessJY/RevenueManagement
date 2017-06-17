@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[37]:
 
 import numpy as np
 import scipy.stats
@@ -359,7 +359,7 @@ class DP_w_featureExtraction():
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[26]:
+# In[52]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -507,7 +507,7 @@ class ALP():
         flattened_names_initial = np.concatenate(names_initial, axis=0).tolist()
         
         r_initial = [r[name] for name in flattened_names_initial]
-        RLP_model += sum(r_initial)
+        RLP_model += pulp.lpSum(r_initial)
         
         # constraints 1, for each sampled state, TJ <= J
         constraints = []
@@ -521,7 +521,7 @@ class ALP():
                 else:
                     current_d_mode = self.demand_model.current_demand_mode(t)
                     r_s_t = [[r[name] for name in n_i[current_d_mode - 1]] for n_i in names[t]] 
-                RHS = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t)])
+                RHS = pulp.lpSum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t)])
                 
                 # calculate LHS, i.e. TJ(s)
                 f_s = self.find_available_products(s) # products that can be sold, based on remaining capacities
@@ -538,11 +538,15 @@ class ALP():
                         r_s_t_next = [[r[name] for name in n_i[next_d_mode - 1]] for n_i in names[t + 1]]
                         
                     # value approximation of the state with the same remaining capacity in next time period
-                    J_s = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t_next)])
+                    J_s = pulp.lpSum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s, r_s_t_next)])
                     total_arrival_rate = 0
 
                     y_values_t = []
                     y_values_t.append(J_s)
+                    
+                    a = [arrival_rates_t[f] * y[y_names[t]] for f in f_s]
+                    a.append((1- pulp.lpSum(arrival_rates_t)) * J_s)
+                    LHS = pulp.lpSum(a)
                     
                     for f in f_s:
                         arrival_rate = arrival_rates_t[f]
@@ -551,14 +555,13 @@ class ALP():
                         A_f = [row[f] for row in self.incidence_matrix]
                         s_f = [s_i - f_i for s_i, f_i in zip(s, A_f)]
                         basis_func_s_f = self.generate_basis_func(s_f)
-                        J_s_f = sum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s_f, r_s_t_next)])
-                        LHS += arrival_rate * y[y_names[t]]
+                        J_s_f = pulp.lpSum([np.dot(b_f_i, r_s_i) for b_f_i, r_s_i in zip(basis_func_s_f, r_s_t_next)])
+
                         y_values_t.append(self.products[f][1] + J_s_f)
 
-                    LHS += (1- sum(arrival_rates_t)) * J_s
                     y_values.append(y_values_t)
                 else:
-                    LHS = sum([arrival_rates_t[f] * self.products[f][1] for f in f_s])
+                    LHS = pulp.lpSum([arrival_rates_t[f] * self.products[f][1] for f in f_s])
 
                 constraint = LHS <= RHS
                 RLP_model += constraint
@@ -631,8 +634,10 @@ class ALP():
 # T = 5
 # ar = [[0.1, 0.2, 0.1], [0.2,0.1,0.3], [0.2,0.3, 0.4]]
 # dm = RM_demand_model.model(ar, T, 2)
+# t = time.time()
 # problem = ALP(p, r, cap, T, dm)
 # problem.get_bid_prices(7)
+# print(time.time() - t)
 
 
 # In[6]:
@@ -814,4 +819,9 @@ T = 3
 # problem = DLBFA(products,resources, capacities, T)
 # problem.calc_value_func()
 # problem.accept_request(2, [1] * 6, 1)
+
+
+# In[ ]:
+
+
 
