@@ -359,7 +359,7 @@ class DP_w_featureExtraction():
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[52]:
+# In[57]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -596,24 +596,22 @@ class ALP():
     
     def collect_bid_prices(self, varsdict, varnames):
         """helper func: after step 2, collect bid prices for each time period and each state from the results of LP"""
-        bid_prices = [[] for _ in range(self.n_resources)]
-        for i in range(self.n_resources):
-            bid_prices_i = []
-            for t in range(self.total_time):
-                bid_prices_t = []
-                for s in range(self.n_states):
-                    remain_cap = RM_helper.remain_cap(self.n_states, self.capacities, s)
-                    
+
+        bid_prices = []
+        for t in range(self.total_time):
+            bid_prices_t = []
+            for s in range(self.n_states):
+                bid_prices_t_s = [0] * self.n_resources
+                remain_cap = RM_helper.remain_cap(self.n_states, self.capacities, s)
+                for i in range(self.n_resources):
                     if self.demand_type == 1:  
                         var_name = '_'.join(['r', self.resources[i], str(t), str(remain_cap[i])])
                     else:
                         current_d_mode = self.demand_model.current_demand_mode(t)
-                        var_name = '_'.join(['r', self.resources[i], str(t), str(current_d_mode - 1),                                             str(remain_cap[i])])
-                    
-                    bp = max(varsdict[var_name], 0)
-#                     print(var_name, bp)
-                    bid_prices_t.append(bp)
-                bid_prices[i].append(bid_prices_t)
+                        var_name = '_'.join(['r', self.resources[i],str(t), str(current_d_mode - 1),str(remain_cap[i])])    
+                    bid_prices_t_s[i] = max(varsdict[var_name], 0)
+                bid_prices_t.append(bid_prices_t_s)
+            bid_prices.append(bid_prices_t)
                     
         return bid_prices
 
@@ -631,13 +629,14 @@ class ALP():
 # p = [['a1', 40],['a2', 30], ['b1', 20]]
 # r = ['a', 'b']
 # cap = [2,2]
-# T = 5
+# T = 10
 # ar = [[0.1, 0.2, 0.1], [0.2,0.1,0.3], [0.2,0.3, 0.4]]
-# dm = RM_demand_model.model(ar, T, 2)
+# dm = RM_demand_model.model(ar, T, 1)
 # t = time.time()
 # problem = ALP(p, r, cap, T, dm)
-# problem.get_bid_prices(7)
+# bp = problem.get_bid_prices(7)
 # print(time.time() - t)
+# print(np.array(bp).shape)
 
 
 # In[6]:
