@@ -359,7 +359,7 @@ class DP_w_featureExtraction():
 # print("--- %s seconds ---" % (time.time() - start_time))
 
 
-# In[57]:
+# In[63]:
 
 ##################################################################
 ###### ADP: LP with feature extraction, and states sampling ######
@@ -496,7 +496,7 @@ class ALP():
         y_values = []
         
         # declare variables
-        r = pulp.LpVariable.dict('r_%s', flattened_names, lowBound= 0)
+        r = pulp.LpVariable.dict('r_%s', flattened_names)
         y = pulp.LpVariable.dict('y_%s', y_names)
         
         # objective function: minimize the value approximation of the initial state
@@ -591,6 +591,7 @@ class ALP():
 #         print(RLP_model)
         varsdict = {}
         for v in RLP_model.variables():
+#             print(v.name, v.varValue)
             varsdict[v.name] = v.varValue
         return (varsdict, flattened_names)
     
@@ -637,6 +638,7 @@ class ALP():
 # bp = problem.get_bid_prices(7)
 # print(time.time() - t)
 # print(np.array(bp).shape)
+# print(bp)
 
 
 # In[6]:
